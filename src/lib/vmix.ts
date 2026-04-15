@@ -26,7 +26,11 @@ const F = {
   GOLES_LOCAL:   'GOLES%20LOCAL',
   GOLES_VISITA:  'GOLES%20VISITA',
   FONDO_LOCAL:   'FONDO%20LOCAL',
-  FONDO_VISITA:  'FONDO%20VISITA',  // incluido — omitir si no existe en el proyecto
+  FONDO_LOCAL_HEX2: 'FONDO%20LOCAL%202', // Mapeo para gradiente
+  FONDO_VISITA:  'FONDO%20VISITA',
+  FONDO_VISITA_HEX2: 'FONDO%20VISITA%202', // Mapeo para gradiente
+  TEXTO_LOCAL:   'TEXTO%20LOCAL',
+  TEXTO_VISITA:  'TEXTO%20VISITA',
   ZONA:          'ZONA',
   PERIODO:       'PERIODO',
   RELOJ:         'RELOJ',
@@ -86,14 +90,24 @@ export async function setGoalVisita(goles: number): Promise<void> {
   await setText(F.GOLES_VISITA, String(goles));
 }
 
-// ── Colores de fondo ─────────────────────────────────────────────────────────
+// ── Colores de fondo y texto ─────────────────────────────────────────────────
 
-export async function setColorLocal(hex: string): Promise<void> {
-  await setColor(F.FONDO_LOCAL, hex);
+export async function setColorLocal(hex1: string, hex2?: string): Promise<void> {
+  await setColor(F.FONDO_LOCAL, hex1);
+  if (hex2) await setColor(F.FONDO_LOCAL_HEX2, hex2);
 }
 
-export async function setColorVisita(hex: string): Promise<void> {
-  await setColor(F.FONDO_VISITA, hex);
+export async function setColorVisita(hex1: string, hex2?: string): Promise<void> {
+  await setColor(F.FONDO_VISITA, hex1);
+  if (hex2) await setColor(F.FONDO_VISITA_HEX2, hex2);
+}
+
+export async function setTextColorLocal(hex: string): Promise<void> {
+  await setColor(F.TEXTO_LOCAL, hex);
+}
+
+export async function setTextColorVisita(hex: string): Promise<void> {
+  await setColor(F.TEXTO_VISITA, hex);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -106,7 +120,11 @@ export interface PartidoVmix {
   nombreVisita:  string;
   zona:          string;
   colorLocal?:   string;
+  colorLocal2?:  string;
+  colorTextoLocal?: string;
   colorVisita?:  string;
+  colorVisita2?: string;
+  colorTextoVisita?: string;
 }
 
 export async function precargarPartido(data: PartidoVmix): Promise<void> {
@@ -117,8 +135,12 @@ export async function precargarPartido(data: PartidoVmix): Promise<void> {
   await setText(F.GOLES_VISITA,  '0');
   await setText(F.RELOJ,         '00:00');
   await setText(F.PERIODO,       'PRIMER TIEMPO');
-  if (data.colorLocal)  await setColor(F.FONDO_LOCAL,  data.colorLocal);
-  if (data.colorVisita) await setColor(F.FONDO_VISITA, data.colorVisita);
+  if (data.colorLocal)      await setColor(F.FONDO_LOCAL,  data.colorLocal);
+  if (data.colorLocal2)     await setColor(F.FONDO_LOCAL_HEX2, data.colorLocal2);
+  if (data.colorTextoLocal) await setColor(F.TEXTO_LOCAL,  data.colorTextoLocal);
+  if (data.colorVisita)     await setColor(F.FONDO_VISITA, data.colorVisita);
+  if (data.colorVisita2)    await setColor(F.FONDO_VISITA_HEX2, data.colorVisita2);
+  if (data.colorTextoVisita) await setColor(F.TEXTO_VISITA,  data.colorTextoVisita);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

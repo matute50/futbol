@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Equipo, Partido, Zona } from '../types';
-import { generarFixtureCompleto } from '../fixture';
+import { HORARIOS_DISPONIBLES } from '../fixture';
 
 interface Props {
   equipos: Equipo[];
@@ -8,255 +8,201 @@ interface Props {
   onPartidosChange: (partidos: Partido[]) => void;
 }
 
-const ZONA_STYLES: Record<Zona, { badge: string; header: string }> = {
-  A: { badge: 'zone-badge-a', header: 'from-blue-900/30 to-transparent' },
-  B: { badge: 'zone-badge-b', header: 'from-green-900/30 to-transparent' },
-  C: { badge: 'zone-badge-c', header: 'from-orange-900/30 to-transparent' },
-};
+const FECHAS_NUM = [1, 2, 3, 4, 5];
+const ZONAS: Zona[] = ['A', 'B', 'C'];
 
 export const TabFixture: React.FC<Props> = ({ equipos, partidos, onPartidosChange }) => {
-  const [confirmando, setConfirmando] = useState(false);
+  const [localFixture, setLocalFixture] = useState<Partido[]>([]);
 
-  const equiposPorZona = (zona: Zona) => equipos.filter(e => e.zona === zona);
-  const zonaCompleta = (zona: Zona) => equiposPorZona(zona).length === 5;
-  const todasCompletas = (['A', 'B', 'C'] as Zona[]).every(z => zonaCompleta(z));
-  const fixtureGenerado = partidos.length > 0;
+  const crearTemplateVacio = () => {
+    const initial: Partido[] = [];
+    FECHAS_NUM.forEach(f => {
+      HORARIOS_DISPONIBLES.forEach((h, idx) => {
+        initial.push({
+          id_partido: `F${f}-H${idx}`, zona: 'A', fecha_numero: f, fecha_calendario: null, turno_horario: h,
+          id_local: null, id_visitante: null, id_libre: null, goles_local: null, goles_visitante: null,
+          estado: 'pendiente', es_libre: false,
+        });
+      });
+      ZONAS.forEach(z => {
+        initial.push({
+          id_partido: `F${f}-Z${z}-LIBRE`, zona: z, fecha_numero: f, fecha_calendario: null, turno_horario: null,
+          id_local: null, id_visitante: null, id_libre: null, goles_local: null, goles_visitante: null,
+          estado: 'pendiente', es_libre: true,
+        });
+      });
+    });
+    return initial;
+  };
 
-  const getEquipoById = (id: string | null) =>
-    id ? equipos.find(e => e.id === id) : null;
-
-  const handleGenerar = () => {
-    if (!todasCompletas) return;
-    if (fixtureGenerado) {
-      setConfirmando(true);
-      return;
+  useEffect(() => {
+    if (partidos.length > 0) {
+      const corregidos = partidos.map(p => {
+        if (p.es_libre || p.turno_horario) return p;
+        const idx = parseInt(p.id_partido.split('-H')[1]);
+        if (!isNaN(idx) && HORARIOS_DISPONIBLES[idx]) return { ...p, turno_horario: HORARIOS_DISPONIBLES[idx] };
+        return p;
+      });
+      setLocalFixture(corregidos);
+    } else {
+      setLocalFixture(crearTemplateVacio());
     }
-    onPartidosChange(generarFixtureCompleto(equipos));
+  }, [partidos]);
+
+  // LÓGICA DE DEDUCCIÓN AUTOMÁTICA DE LIBRES
+  // Se ejecuta cada vez que cambia localFixture
+  useEffect(() => {
+    let haCambiado = false;
+    const nuevoFixture = localFixture.map(p => {
+      if (!p.es_libre) return p;
+
+      // Buscar equipos de esta zona que NO están en los partidos de esta fecha
+      const equiposZona = equipos.filter(e => e.zona === p.zona);
+      if (equiposZona.length < 5) return p; // Solo deducir si la zona está completa
+
+      const partidosFechaZona = localFixture.filter(pf => pf.fecha_numero === p.fecha_numero && pf.zona === p.zona && !pf.es_libre);
+      const idsJugando = new Set<string>();
+      partidosFechaZona.forEach(pf => {
+        if (pf.id_local) idsJugando.add(pf.id_local);
+        if (pf.id_visitante) idsJugando.add(pf.id_visitante);
+      });
+
+      const equiposLibres = equiposZona.filter(e => !idsJugando.has(e.id));
+      
+      // Si hay exactamente 1 equipo que no juega, ese es el libre
+      const nuevoIdLibre = equiposLibres.length === 1 ? equiposLibres[0].id : null;
+      
+      if (p.id_libre !== nuevoIdLibre) {
+        haCambiado = true;
+        return { ...p, id_libre: nuevoIdLibre };
+      }
+      return p;
+    });
+
+    if (haCambiado) {
+      setLocalFixture(nuevoFixture);
+    }
+  }, [localFixture, equipos]);
+
+  const updateMatch = (id: string, field: keyof Partido, value: any) => {
+    let updated = localFixture.map(p => {
+      if (p.id_partido !== id) return p;
+      const newP = { ...p, [field]: value };
+      if (field === 'id_local' && value) {
+        const eq = equipos.find(e => e.id === value);
+        if (eq) {
+          newP.zona = eq.zona;
+          const visit = equipos.find(e => e.id === p.id_visitante);
+          if (visit && visit.zona !== eq.zona) newP.id_visitante = null;
+        }
+      }
+      return newP;
+    });
+    setLocalFixture(updated);
   };
 
-  const confirmarRegenerar = () => {
-    onPartidosChange(generarFixtureCompleto(equipos));
-    setConfirmando(false);
+  const handleGuardar = () => {
+    onPartidosChange(localFixture);
   };
 
-  const partidosPorZona = (zona: Zona) =>
-    partidos.filter(p => p.zona === zona && !p.es_libre);
+  const handleReiniciar = () => {
+    if (window.confirm('¿Está seguro de REINICIAR el fixture?')) setLocalFixture(crearTemplateVacio());
+  };
 
-  const libresPorZona = (zona: Zona) =>
-    partidos.filter(p => p.zona === zona && p.es_libre);
+  const getEquiposVisitantes = (idLocal: string | null) => {
+    if (!idLocal) return [];
+    const eqL = equipos.find(e => e.id === idLocal);
+    return eqL ? equipos.filter(e => e.zona === eqL.zona && e.id !== idLocal) : [];
+  };
+
+  const getEquipoById = (id: string | null) => id ? equipos.find(e => e.id === id) : null;
 
   return (
-    <div className="fade-in space-y-6">
-      {/* Panel de estado */}
-      <div className="glass-card p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold mb-1">Generación de Fixture Round-Robin</h3>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              5 fechas por zona · 2 partidos por fecha · 1 equipo libre por fecha
-            </p>
-          </div>
-          <div className="flex gap-3 items-center">
-            {(['A', 'B', 'C'] as Zona[]).map(zona => (
-              <div key={zona} className="flex items-center gap-1.5 text-sm">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    zonaCompleta(zona) ? 'bg-green-400' : 'bg-gray-600'
-                  }`}
-                />
-                <span style={{ color: zonaCompleta(zona) ? '#22c55e' : 'var(--text-secondary)' }}>
-                  Zona {zona}
-                </span>
-              </div>
-            ))}
-            <button
-              className="btn-gold ml-4"
-              onClick={handleGenerar}
-              disabled={!todasCompletas}
-              title={!todasCompletas ? 'Debe cargar los 15 equipos primero' : ''}
-            >
-              {fixtureGenerado ? '↺ Regenerar Fixture' : '⚡ Generar Fixture'}
-            </button>
-          </div>
+    <div className="fade-in space-y-12" style={{ paddingBottom: '120px' }}>
+      <div className="glass-card p-8 flex items-center justify-between shadow-2xl sticky top-0 z-20" style={{ backdropFilter: 'blur(20px)', background: 'rgba(13,17,23,0.9)', borderBottom: '1px solid var(--gold)' }}>
+        <div>
+          <h2 className="text-3xl font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald, sans-serif' }}>Carga de Fixture por Fecha</h2>
         </div>
-
-        {!todasCompletas && (
-          <div
-            className="mt-4 p-3 rounded-lg text-sm flex items-center gap-2"
-            style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#eab308' }}
-          >
-            <span>⚠</span>
-            <span>
-              Para generar el fixture es necesario que las 3 zonas tengan 5 equipos cada una.
-              Actualmente:{' '}
-              {(['A', 'B', 'C'] as Zona[])
-                .map(z => `Zona ${z}: ${equiposPorZona(z).length}/5`)
-                .join(' · ')}
-            </span>
-          </div>
-        )}
-
-        {/* Modal de confirmación */}
-        {confirmando && (
-          <div
-            className="mt-4 p-4 rounded-lg flex items-center justify-between"
-            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
-          >
-            <span className="text-sm" style={{ color: '#ef4444' }}>
-              ⚠ Regenerar el fixture eliminará todas las fechas y horarios asignados. ¿Confirmar?
-            </span>
-            <div className="flex gap-2">
-              <button
-                className="btn-danger"
-                onClick={confirmarRegenerar}
-              >
-                Sí, regenerar
-              </button>
-              <button
-                onClick={() => setConfirmando(false)}
-                className="text-sm px-3 py-1 rounded"
-                style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="flex gap-4">
+          <button className="px-6 py-4 rounded-xl text-xs font-black uppercase tracking-widest border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-all font-sans" onClick={handleReiniciar}>⚠ Reiniciar Carga</button>
+          <button className="btn-gold py-4 px-12 text-lg font-black tracking-[0.2em] shadow-2xl" onClick={handleGuardar}>✓ GUARDAR FIXTURE</button>
+        </div>
       </div>
 
-      {/* Fixture por zona */}
-      {fixtureGenerado ? (
-        <div className="space-y-6">
-          {(['A', 'B', 'C'] as Zona[]).map(zona => {
-            const style = ZONA_STYLES[zona];
-            const pz = partidosPorZona(zona);
-            const lz = libresPorZona(zona);
+      <div className="space-y-20">
+        {FECHAS_NUM.map(f => {
+          const partidosFecha = localFixture
+            .filter(p => p.fecha_numero === f && !p.es_libre)
+            .sort((a,b) => HORARIOS_DISPONIBLES.indexOf(a.turno_horario || '') - HORARIOS_DISPONIBLES.indexOf(b.turno_horario || ''));
+          const libresFecha = localFixture.filter(p => p.fecha_numero === f && p.es_libre);
 
-            return (
-              <div key={zona} className="glass-card overflow-hidden">
-                {/* Header zona */}
-                <div className={`p-4 bg-gradient-to-r ${style.header} border-b`} style={{ borderColor: 'var(--dark-border)' }}>
-                  <div className="flex items-center gap-3">
-                    <span className={`px-3 py-1 rounded font-bold text-sm ${style.badge}`}>
-                      ZONA {zona}
-                    </span>
-                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {pz.length} partidos · {lz.length} fechas libres
-                    </span>
-                  </div>
-                </div>
+          return (
+            <div key={f} className="space-y-6">
+              <div className="flex items-center gap-6">
+                 <h3 className="text-5xl font-black uppercase italic text-white" style={{ fontFamily: 'Oswald, sans-serif' }}>FECHA {f}</h3>
+                 <div className="h-1 flex-1 bg-gradient-to-r from-gold/50 to-transparent rounded-full" />
+              </div>
 
-                {/* Tabla de partidos */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--dark-border)', background: 'rgba(255,255,255,0.02)' }}>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>FECHA</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>PARTIDO</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>LOCAL</th>
-                        <th className="px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>VS</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>VISITANTE</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>ID PARTIDO</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Array.from({ length: 5 }, (_, f) => f + 1).map(fecha => {
-                        const ps = pz.filter(p => p.fecha_numero === fecha);
-                        const libre = lz.find(p => p.fecha_numero === fecha);
-                        const equipoLibre = getEquipoById(libre?.id_libre ?? null);
+              <div className="glass-card overflow-hidden shadow-2xl border border-white/5">
+                <table className="w-full text-left" style={{ tableLayout: 'fixed' }}>
+                  <colgroup><col style={{ width: '130px' }} /><col style={{ width: '140px' }} /><col /><col /><col style={{ width: '180px' }} /></colgroup>
+                  <thead>
+                    <tr className="bg-white/5" style={{ borderBottom: '2px solid rgba(255,255,255,0.05)' }}>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">HORARIO</th>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">GRUPO</th>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">LOCAL (TODOS)</th>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">VISITANTE (ZONA)</th>
+                      <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">ESTADO</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {partidosFecha.map((m) => {
+                      const localSel = getEquipoById(m.id_local);
+                      const eqsVisit = getEquiposVisitantes(m.id_local);
+                      return (
+                        <tr key={m.id_partido} className="hover:bg-white/2 transition-colors">
+                          <td className="px-8 py-4 text-center"><span className="text-2xl font-black text-gold italic" style={{ fontFamily: 'Oswald' }}>{m.turno_horario || '—:—'}</span></td>
+                          <td className="px-8 py-4"><div className="flex justify-center"><div className={`px-4 py-1.5 rounded-lg text-[9px] font-black tracking-widest uppercase transition-all shadow-md ${localSel ? `zone-badge-${localSel.zona.toLowerCase()} scale-105` : 'bg-gray-800 text-gray-500'}`} style={{ minWidth: '90px', textAlign: 'center' }}>{localSel ? `ZONA ${localSel.zona}` : '—'}</div></div></td>
+                          <td className="px-8 py-4">
+                            <select className="input-field py-3 text-sm font-bold w-full uppercase" value={m.id_local || ''} onChange={e => updateMatch(m.id_partido, 'id_local', e.target.value)}>
+                              <option value="">— SELECCIONE LOCAL —</option>
+                              {equipos.sort((a,b) => a.nombre.localeCompare(b.nombre)).map(e => <option key={e.id} value={e.id} style={{background:'#161b22'}}>{e.nombre.toUpperCase()}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-8 py-4">
+                            <select className="input-field py-3 text-sm font-bold w-full uppercase" value={m.id_visitante || ''} onChange={e => updateMatch(m.id_partido, 'id_visitante', e.target.value)} disabled={!m.id_local}>
+                              {!m.id_local ? <option value="">— BLOQUEADO —</option> : <><option value="">— SELECCIONE VISITANTE —</option>{eqsVisit.map(e => <option key={e.id} value={e.id} style={{background:'#161b22'}}>{e.nombre.toUpperCase()}</option>)}</>}
+                            </select>
+                          </td>
+                          <td className="px-8 py-4 text-center"><span className="text-2xl font-black italic tracking-[0.1em] text-yellow-500/80 uppercase" style={{ fontFamily: 'Oswald' }}>PENDIENTE</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                        return (
-                          <React.Fragment key={fecha}>
-                            {ps.map((p, idx) => {
-                              const local = getEquipoById(p.id_local);
-                              const visitante = getEquipoById(p.id_visitante);
-                              return (
-                                <tr
-                                  key={p.id_partido}
-                                  className="match-row"
-                                  style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
-                                >
-                                  {idx === 0 && (
-                                    <td rowSpan={3} className="px-4 py-3 align-middle">
-                                      <div
-                                        className={`inline-block px-2 py-1 rounded font-bold text-xs ${style.badge}`}
-                                        style={{ fontFamily: 'Oswald, sans-serif' }}
-                                      >
-                                        F{fecha}
-                                      </div>
-                                    </td>
-                                  )}
-                                  <td className="px-4 py-3">
-                                    <span
-                                      className="text-xs font-mono px-2 py-0.5 rounded"
-                                      style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}
-                                    >
-                                      {p.id_partido}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <span className="font-medium">{local?.nombre}</span>
-                                    <span
-                                      className={`ml-2 text-xs px-1.5 rounded ${style.badge}`}
-                                    >
-                                      {local?.codigo}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-center font-bold" style={{ color: 'var(--text-secondary)' }}>
-                                    VS
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <span className="font-medium">{visitante?.nombre}</span>
-                                    <span className={`ml-2 text-xs px-1.5 rounded ${style.badge}`}>
-                                      {visitante?.codigo}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <span className="status-pending">Pendiente</span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-
-                            {/* Fila de equipo libre */}
-                            {libre && (
-                              <tr className="bye-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                <td className="px-4 py-2.5 text-xs italic" style={{ color: 'var(--text-secondary)' }}>
-                                  — Libre
-                                </td>
-                                <td colSpan={4} className="px-4 py-2.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                  Descansa:{' '}
-                                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                                    {equipoLibre?.nombre}{' '}
-                                    <span className={`text-xs px-1 rounded ${style.badge}`}>{equipoLibre?.codigo}</span>
-                                  </span>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              <div className="glass-card p-6 bg-white/2 border-dashed border-2 border-white/5 opacity-80">
+                <div className="text-[10px] font-black tracking-[0.3em] text-gray-500 uppercase mb-4 text-center italic">EQUIPOS QUE DESCANSAN (DEDUCIDO AUTOMÁTICAMENTE)</div>
+                <div className="flex justify-center gap-12">
+                  {ZONAS.map(z => {
+                    const libre = libresFecha.find(l => l.zona === z);
+                    const eqLibre = getEquipoById(libre?.id_libre || null);
+                    return (
+                      <div key={z} className="flex items-center gap-4 bg-black/20 px-6 py-3 rounded-xl border border-white/5">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black zone-badge-${z.toLowerCase()}`}>ZONA {z}</span>
+                        <span className="text-lg font-black tracking-tight uppercase text-gold" style={{ fontFamily: 'Oswald' }}>
+                           {eqLibre ? eqLibre.nombre.toUpperCase() : 'NO DETERMINADO'}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div
-          className="glass-card p-12 text-center"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          <div className="text-5xl mb-4">📋</div>
-          <div className="text-lg font-semibold mb-2">Sin fixture generado</div>
-          <div className="text-sm">
-            {todasCompletas
-              ? 'Presione "Generar Fixture" para crear el torneo Round-Robin.'
-              : 'Cargue los 15 equipos (5 por zona) para habilitar la generación del fixture.'}
-          </div>
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

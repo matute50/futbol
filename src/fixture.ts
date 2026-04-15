@@ -94,8 +94,7 @@ export function generarCodigoEquipo(zona: Zona, indiceEnZona: number): string {
 
 // Horarios disponibles por defecto para turnos
 export const HORARIOS_DISPONIBLES = [
-  '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
+  '09.00', '10.30', '12.00', '13.30', '15.00', '16.30'
 ];
 
 // Colores por zona

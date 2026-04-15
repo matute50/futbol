@@ -10,6 +10,12 @@ export interface Equipo {
   zona: Zona;
   /** Nomenclatura automática: A1, A2, B3, etc. */
   codigo: string;
+  /** Color principal del equipo (hex) */
+  color?: string | null;
+  /** Color secundario para gradientes (hex) */
+  color_secundario?: string | null;
+  /** Color de texto contrastante (hex) */
+  color_texto?: string | null;
 }
 
 export interface Partido {

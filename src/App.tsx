@@ -1,30 +1,29 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from './supabase';
 import type { Equipo, Partido, TabActiva } from './types';
 import { TabEquipos } from './components/TabEquipos';
 import { TabFixture } from './components/TabFixture';
 import { TabCronograma } from './components/TabCronograma';
 import { TabConsola } from './components/TabConsola';
-import {
-  cargarEquiposDB,
-  cargarPartidosDB,
-  insertarEquipoDB,
-  eliminarEquipoDB,
-  actualizarCodigosDB,
-  limpiarEquiposDB,
-  insertarPartidosBatchDB,
-  actualizarPartidoDB,
-  limpiarPartidosDB,
+import { OverlayMarcador } from './components/OverlayMarcador';
+import { 
+  cargarEquiposDB, 
+  cargarPartidosDB, 
+  insertarEquipoDB, 
+  actualizarEquipoDB, 
+  insertarPartidosBatchDB, 
+  actualizarPartidoDB 
 } from './db';
-import { generarCodigoEquipo } from './fixture';
+import { generarCodigoEquipo, HORARIOS_DISPONIBLES } from './fixture';
 
 // Extender TabActiva para incluir la consola
 type TabActivaExtended = TabActiva | 'consola';
 
-const TABS: { id: TabActivaExtended; label: string; icon: string; desc: string }[] = [
-  { id: 'equipos',   label: 'Carga de Equipos',      icon: '👥', desc: '15 equipos · 3 zonas' },
-  { id: 'fixture',   label: 'Generar Fixture',        icon: '📋', desc: 'Round-Robin por zona' },
-  { id: 'cronograma',label: 'Cronograma de Partidos', icon: '📅', desc: 'Fechas y turnos' },
-  { id: 'consola',   label: 'Consola de Transmisión', icon: '📺', desc: 'vMix · En directo' },
+const TABS: { id: TabActivaExtended; label: string }[] = [
+  { id: 'equipos',    label: 'Carga de Equipos' },
+  { id: 'fixture',    label: 'Generar Fixture' },
+  { id: 'cronograma', label: 'Cronograma de Partidos' },
+  { id: 'consola',    label: 'Consola de Transmisión' },
 ];
 
 type SyncStatus = 'idle' | 'loading' | 'saving' | 'ok' | 'error';
@@ -36,6 +35,9 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
   const [syncMsg,   setSyncMsg]    = useState('Cargando datos...');
 
+  // Simple detección de vista (overlay o dashboard)
+  const isOverlay = new URLSearchParams(window.location.search).get('view') === 'overlay';
+
   // ── Carga inicial desde Supabase ──────────────────────────────────────────
   useEffect(() => {
     const cargar = async () => {
@@ -44,7 +46,39 @@ export default function App() {
       try {
         const [eqs, pts] = await Promise.all([cargarEquiposDB(), cargarPartidosDB()]);
         setEquipos(eqs);
-        setPartidos(pts);
+        
+        if (pts.length === 0) {
+          // Inicializar fixture vacío con los horarios conocidos (5 fechas x 6 horarios)
+          const initial: Partido[] = [];
+          [1,2,3,4,5].forEach(f => {
+            HORARIOS_DISPONIBLES.forEach((h, idx) => {
+              initial.push({
+                id_partido: `F${f}-H${idx}`,
+                zona: 'A',
+                fecha_numero: f,
+                fecha_calendario: null,
+                turno_horario: h,
+                id_local: null, id_visitante: null, id_libre: null,
+                goles_local: null, goles_visitante: null,
+                estado: 'pendiente', es_libre: false
+              });
+            });
+            // 3 libres por fecha
+            ['A','B','C'].forEach(z => {
+              initial.push({
+                id_partido: `F${f}-Z${z}-LIBRE`,
+                zona: (z as any), fecha_numero: f, fecha_calendario: null, turno_horario: null,
+                id_local: null, id_visitante: null, id_libre: null,
+                goles_local: null, goles_visitante: null,
+                estado: 'pendiente', es_libre: true
+              });
+            });
+          });
+          setPartidos(initial);
+        } else {
+          setPartidos(pts);
+        }
+        
         setSyncStatus('ok');
         setSyncMsg('Datos cargados');
       } catch (e) {
@@ -54,6 +88,16 @@ export default function App() {
       }
     };
     cargar();
+
+    // Suscripción en tiempo real para equipos
+    const channel = supabase
+      .channel('db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipos' }, () => {
+        cargarEquiposDB().then(setEquipos);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const mostrarOk = (msg = 'Guardado') => {
@@ -75,57 +119,27 @@ export default function App() {
     } catch (e) { mostrarError('Error al guardar equipo'); console.error(e); }
   }, []);
 
-  const handleEliminarEquipo = useCallback(async (id: string) => {
-    setSyncStatus('saving');
+  const handleEditarEquipo = useCallback(async (id: string, campos: Partial<Equipo>) => {
+    setEquipos(prev => prev.map(e => e.id === id ? { ...e, ...campos } : e));
     try {
-      await eliminarEquipoDB(id);
-      setEquipos(prev => {
-        const nuevos = prev.filter(e => e.id !== id);
-        const recalc = nuevos.map(e => {
-          const idx = nuevos.filter(x => x.zona === e.zona).indexOf(e) + 1;
-          return { ...e, codigo: generarCodigoEquipo(e.zona, idx) };
-        });
-        actualizarCodigosDB(recalc).catch(console.error);
-        return recalc;
-      });
-      mostrarOk('Equipo eliminado');
-    } catch (e) { mostrarError('Error al eliminar equipo'); console.error(e); }
+      await actualizarEquipoDB(id, campos);
+      mostrarOk('Equipo actualizado');
+    } catch (e) { mostrarError('Error al actualizar equipo'); console.error(e); }
   }, []);
+
 
   // ── Partidos ──────────────────────────────────────────────────────────────
   const handlePartidosChange = useCallback(async (nuevosPartidos: Partido[]) => {
-    const esFixtureNuevo = nuevosPartidos.length !== partidos.length ||
-      nuevosPartidos.some(p => !partidos.find(pp => pp.id_partido === p.id_partido));
-
     setPartidos(nuevosPartidos);
     setSyncStatus('saving');
     try {
-      if (esFixtureNuevo) {
-        await insertarPartidosBatchDB(nuevosPartidos);
-        mostrarOk('Fixture guardado en Supabase');
-      } else {
-        const cambios = nuevosPartidos.filter(p => {
-          const ant = partidos.find(pp => pp.id_partido === p.id_partido);
-          return ant && (
-            ant.fecha_calendario !== p.fecha_calendario ||
-            ant.turno_horario    !== p.turno_horario    ||
-            ant.goles_local      !== p.goles_local      ||
-            ant.goles_visitante  !== p.goles_visitante  ||
-            ant.estado           !== p.estado
-          );
-        });
-        await Promise.all(cambios.map(p => actualizarPartidoDB(p.id_partido, {
-          fecha_calendario: p.fecha_calendario,
-          turno_horario:    p.turno_horario,
-          goles_local:      p.goles_local,
-          goles_visitante:  p.goles_visitante,
-          estado:           p.estado,
-        })));
-        if (cambios.length > 0) mostrarOk('Cronograma actualizado');
-        else setSyncStatus('idle');
-      }
-    } catch (e) { mostrarError('Error al sincronizar con Supabase'); console.error(e); }
-  }, [partidos]);
+      await insertarPartidosBatchDB(nuevosPartidos);
+      mostrarOk('Datos sincronizados con Supabase');
+    } catch (e) { 
+      mostrarError('Error al sincronizar con Supabase'); 
+      console.error(e); 
+    }
+  }, []);
 
   // ── Partido finalizado desde la Consola ───────────────────────────────────
   const handlePartidoFinalizado = useCallback((idPartido: string, golesLocal: number, golesVisita: number) => {
@@ -137,17 +151,6 @@ export default function App() {
     mostrarOk('Resultado guardado ✓');
   }, []);
 
-  // ── Reset ─────────────────────────────────────────────────────────────────
-  const resetearTodo = async () => {
-    if (!confirm('¿Eliminar todos los equipos y el fixture? Esta acción no se puede deshacer.')) return;
-    setSyncStatus('saving');
-    try {
-      await limpiarPartidosDB();
-      await limpiarEquiposDB();
-      setEquipos([]); setPartidos([]);
-      mostrarOk('Datos eliminados');
-    } catch (e) { mostrarError('Error al reiniciar datos'); console.error(e); }
-  };
 
   const equiposPorZona = (zona: 'A' | 'B' | 'C') => equipos.filter(e => e.zona === zona).length;
   const fixtureGenerado = partidos.length > 0;
@@ -156,16 +159,19 @@ export default function App() {
     idle: 'transparent', loading: '#3b82f6', saving: '#f59e0b', ok: '#22c55e', error: '#ef4444',
   };
   const syncLabel: Record<SyncStatus, string> = {
-    idle: '', loading: '⟳ Cargando...', saving: '⟳ Guardando...',
-    ok: `✓ ${syncMsg}`, error: `✕ ${syncMsg}`,
+    idle: '', loading: '⟳ Cargando...', saving: '⟳ Guardando...', ok: '✓ Sincronizado', error: '⚠ Error de conexión'
   };
+
+  if (isOverlay) {
+    return <OverlayMarcador />;
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--dark-bg)' }}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="gradient-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '0 24px' }}>
+        <div style={{ maxWidth: '1800px', margin: '0 auto', padding: '0 40px' }}>
           <div className="flex items-center justify-between" style={{ height: '72px' }}>
 
             <div className="flex items-center gap-4">
@@ -222,37 +228,33 @@ export default function App() {
                 </div>
               )}
 
-              <div className="text-xs px-2 py-1 rounded flex items-center gap-1.5"
-                style={{ background: 'rgba(62,207,142,0.1)', color: '#3ecf8e', border: '1px solid rgba(62,207,142,0.25)' }}>
-                ⚡ Supabase
-              </div>
+              {/* Botón RESET Global (solo en Consola) */}
+              {tabActiva === 'consola' && (
+                <button 
+                  onClick={() => window.dispatchEvent(new CustomEvent('reset-match'))}
+                  style={{ 
+                    background: '#ef4444', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px',
+                    fontFamily: 'Oswald', fontSize: '12px', fontWeight: 900, cursor: 'pointer', letterSpacing: '1px',
+                    boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)', transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
+                  onMouseOut={(e) => e.currentTarget.style.filter = 'none'}
+                >
+                  RESET PARTIDO
+                </button>
+              )}
 
-              <button onClick={resetearTodo} className="btn-danger" style={{ fontSize: '11px' }}>
-                ↺ Reiniciar
-              </button>
+
             </div>
           </div>
         </div>
       </header>
 
-      {/* Zona pills */}
-      <div style={{ background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid var(--dark-border)' }}>
-        <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '8px 24px' }}>
-          <div className="flex items-center gap-4 text-xs">
-            <span style={{ color: 'var(--text-secondary)' }}>Zonas:</span>
-            {(['A', 'B', 'C'] as const).map(z => (
-              <span key={z} className={`px-2 py-0.5 rounded font-medium zone-badge-${z.toLowerCase()}`}>
-                Zona {z}: {equiposPorZona(z)}/5
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* ── Tabs ─────────────────────────────────────────────────────────────── */}
       <div style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--dark-border)' }}>
-        <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '0 24px' }}>
-          <div className="flex gap-1" style={{ paddingTop: '8px' }}>
+        <div style={{ maxWidth: '1800px', margin: '0 auto', padding: '0 40px' }}>
+          <div className="flex gap-8" style={{ paddingTop: '8px' }}>
             {TABS.map(tab => (
               <button
                 key={tab.id}
@@ -268,19 +270,7 @@ export default function App() {
                   } : {}),
                 }}
               >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-                <span className="text-xs px-1.5 py-0.5 rounded" style={{
-                  background: tab.id === 'consola' && tabActiva !== 'consola'
-                    ? 'rgba(239,68,68,0.15)'
-                    : 'rgba(255,255,255,0.08)',
-                  color: tab.id === 'consola' && tabActiva !== 'consola'
-                    ? '#f87171'
-                    : 'var(--text-secondary)',
-                  fontWeight: 400,
-                }}>
-                  {tab.desc}
-                </span>
+                 <span>{tab.label}</span>
               </button>
             ))}
           </div>
@@ -299,12 +289,12 @@ export default function App() {
 
       {/* ── Contenido ─────────────────────────────────────────────────────────── */}
       {syncStatus !== 'loading' && (
-        <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px' }}>
+        <main style={{ maxWidth: '1800px', margin: '0 auto', padding: '10px 40px 40px 40px' }}>
           {tabActiva === 'equipos' && (
             <TabEquipos
               equipos={equipos}
               onAgregarEquipo={handleAgregarEquipo}
-              onEliminarEquipo={handleEliminarEquipo}
+              onEditarEquipo={handleEditarEquipo}
             />
           )}
           {tabActiva === 'fixture' && (
@@ -331,11 +321,6 @@ export default function App() {
         </main>
       )}
 
-      <footer style={{ borderTop: '1px solid var(--dark-border)', marginTop: '40px', padding: '16px 24px', textAlign: 'center' }}>
-        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          Liga de Veteranos · Saladillo Vivo · Sistema de Gestión de Torneo · Supabase · vMix 27
-        </p>
-      </footer>
     </div>
   );
 }

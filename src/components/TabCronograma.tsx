@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Equipo, Partido, Zona } from '../types';
-import { HORARIOS_DISPONIBLES } from '../fixture';
 
 interface Props {
   equipos: Equipo[];
@@ -8,325 +7,162 @@ interface Props {
   onPartidosChange: (partidos: Partido[]) => void;
 }
 
-const ZONA_STYLES: Record<Zona, { badge: string; text: string }> = {
-  A: { badge: 'zone-badge-a', text: 'text-blue-400' },
-  B: { badge: 'zone-badge-b', text: 'text-green-400' },
-  C: { badge: 'zone-badge-c', text: 'text-orange-400' },
+const ZONA_STYLES: Record<Zona, string> = {
+  A: 'zone-badge-a',
+  B: 'zone-badge-b',
+  C: 'zone-badge-c',
 };
 
+export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
+  const [fechaActiva, setFechaActiva] = useState<number>(1);
 
-
-export const TabCronograma: React.FC<Props> = ({ equipos, partidos, onPartidosChange }) => {
-  const [filtroZona, setFiltroZona] = useState<Zona | 'TODAS'>('TODAS');
-  const [filtroFecha, setFiltroFecha] = useState<number | 'TODAS'>('TODAS');
-
-  const getEquipoById = (id: string | null) =>
-    id ? equipos.find(e => e.id === id) : null;
-
+  const getEquipoById = (id: string | null) => id ? equipos.find(e => e.id === id) : null;
   const fixtureGenerado = partidos.length > 0;
 
-  const actualizarPartido = (id_partido: string, campo: 'fecha_calendario' | 'turno_horario', valor: string) => {
-    const nuevos = partidos.map(p =>
-      p.id_partido === id_partido ? { ...p, [campo]: valor || null } : p
-    );
-    onPartidosChange(nuevos);
-  };
-
-  const asignarFechaAJornada = (fechaNumero: number, fechaCalendario: string) => {
-    const nuevos = partidos.map(p =>
-      p.fecha_numero === fechaNumero ? { ...p, fecha_calendario: fechaCalendario || null } : p
-    );
-    onPartidosChange(nuevos);
-  };
-
-  const sortearTurnos = (fechaNumero: number) => {
-    const partidosFecha = partidos.filter(p => p.fecha_numero === fechaNumero && !p.es_libre);
-    const horariosMezclados = [...HORARIOS_DISPONIBLES]
-      .sort(() => Math.random() - 0.5)
-      .slice(0, partidosFecha.length);
-
-    const nuevos = partidos.map(p => {
-      if (p.fecha_numero !== fechaNumero || p.es_libre) return p;
-      const idx = partidosFecha.findIndex(pp => pp.id_partido === p.id_partido);
-      return { ...p, turno_horario: horariosMezclados[idx] ?? null };
+  const listaFechas = useMemo(() => 
+    Array.from(new Set(partidos.map(p => p.fecha_numero))).sort((a,b) => a-b)
+  , [partidos]);
+  
+  const partidosHoy = useMemo(() => 
+    partidos
+      .filter(p => p.fecha_numero === fechaActiva && !p.es_libre)
+      .sort((a,b) => {
+         const hOrder = ["09.00", "10.30", "12.00", "13.30", "15.00", "16.30"];
+         return hOrder.indexOf(a.turno_horario || "") - hOrder.indexOf(b.turno_horario || "");
+      })
+  , [partidos, fechaActiva]);
+    
+  const libresHoyCalculados = useMemo(() => {
+    return ['A', 'B', 'C'].map(z => {
+      const eqsZona = equipos.filter(e => e.zona === z);
+      if (eqsZona.length < 5) return { zona: z, equipo: null };
+      const idsJugando = new Set<string>();
+      partidosHoy.filter(p => p.zona === z).forEach(p => {
+        if (p.id_local) idsJugando.add(pf => pf.id_local); // Fix: use local id
+      });
+      // Actually simpler:
+      const idsHoy = new Set<string>();
+      partidosHoy.forEach(ph => {
+        if (ph.id_local) idsHoy.add(ph.id_local);
+        if (ph.id_visitante) idsHoy.add(ph.id_visitante);
+      });
+      const eqLibre = eqsZona.find(e => !idsHoy.has(e.id));
+      return { zona: z as Zona, equipo: eqLibre || null };
     });
-    onPartidosChange(nuevos);
-  };
-
-  // Partidos filtrados (solo partidos reales, no libres)
-  const partidosReales = partidos.filter(p => !p.es_libre);
-  const partidosFiltrados = partidosReales.filter(p => {
-    if (filtroZona !== 'TODAS' && p.zona !== filtroZona) return false;
-    if (filtroFecha !== 'TODAS' && p.fecha_numero !== filtroFecha) return false;
-    return true;
-  });
-
-  // Obtener fecha calendario de una jornada (todos los partidos de esa jornada tienen la misma)
-  const getFechaDeJornada = (fechaNum: number) =>
-    partidos.find(p => p.fecha_numero === fechaNum)?.fecha_calendario ?? '';
-
-  const fechas = Array.from(new Set(partidos.map(p => p.fecha_numero))).sort();
-
-  // Calcular turnos asignados y pendientes
-  const totalPartidosReales = partidosReales.length;
-  const conTurno = partidosReales.filter(p => p.turno_horario).length;
-  const conFecha = partidosReales.filter(p => p.fecha_calendario).length;
+  }, [partidosHoy, equipos]);
 
   return (
-    <div className="fade-in space-y-6">
-      {/* Header stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="glass-card p-4 text-center">
-          <div className="text-2xl font-bold text-white" style={{ fontFamily: 'Oswald, sans-serif' }}>
-            {totalPartidosReales}
-          </div>
-          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Total Partidos</div>
-        </div>
-        <div className="glass-card p-4 text-center">
-          <div className="text-2xl font-bold text-yellow-400" style={{ fontFamily: 'Oswald, sans-serif' }}>
-            {conFecha}/{totalPartidosReales}
-          </div>
-          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Con Fecha Asignada</div>
-        </div>
-        <div className="glass-card p-4 text-center">
-          <div className="text-2xl font-bold text-green-400" style={{ fontFamily: 'Oswald, sans-serif' }}>
-            {conTurno}/{totalPartidosReales}
-          </div>
-          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Con Turno Asignado</div>
-        </div>
-      </div>
-
+    <div className="fade-in space-y-4" style={{ height: 'calc(100vh - 180px)', display: 'flex', flexDirection: 'column' }}>
+      
       {!fixtureGenerado ? (
-        <div className="glass-card p-12 text-center" style={{ color: 'var(--text-secondary)' }}>
-          <div className="text-5xl mb-4">📅</div>
-          <div className="text-lg font-semibold mb-2">Sin cronograma disponible</div>
-          <div className="text-sm">Genere el fixture primero para poder asignar fechas y horarios.</div>
+        <div className="glass-card p-12 text-center flex-1 flex flex-col justify-center">
+          <div className="text-6xl mb-4 opacity-10">📅</div>
+          <h2 className="text-2xl font-black uppercase text-gray-500">Sin cronograma</h2>
         </div>
       ) : (
         <>
-          {/* Gestión por Jornada */}
-          <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span>📅</span> Asignación de Fechas por Jornada
-            </h3>
-            <div className="grid grid-cols-5 gap-3">
-              {fechas.map(fn => {
-                const fechaCal = getFechaDeJornada(fn);
-                const pFecha = partidosReales.filter(p => p.fecha_numero === fn);
-                const turnosOk = pFecha.filter(p => p.turno_horario).length;
-                return (
-                  <div key={fn} className="glass-card p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm" style={{ fontFamily: 'Oswald, sans-serif', color: 'var(--gold)' }}>
-                        Jornada {fn}
-                      </span>
-                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                        {turnosOk}/{pFecha.length} turnos
-                      </span>
-                    </div>
-                    <input
-                      type="date"
-                      className="input-field text-xs"
-                      value={fechaCal || ''}
-                      onChange={e => asignarFechaAJornada(fn, e.target.value)}
-                    />
-                    <button
-                      className="btn-primary w-full text-xs justify-center py-1.5"
-                      onClick={() => sortearTurnos(fn)}
-                      style={{ fontSize: '11px' }}
-                    >
-                      🎲 Sortear Turnos
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Filtros */}
-          <div className="glass-card p-4 flex gap-4 items-center">
-            <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Filtrar:</span>
+          {/* Tabs Compactos */}
+          <div className="flex gap-4 items-center justify-between bg-black/40 p-2 rounded-xl border border-white/5">
             <div className="flex gap-2">
-              {(['TODAS', 'A', 'B', 'C'] as const).map(z => (
-                <button
-                  key={z}
-                  onClick={() => setFiltroZona(z)}
-                  className={`px-3 py-1 rounded text-sm font-medium transition-all ${
-                    filtroZona === z ? 'tab-active' : 'tab-inactive'
-                  }`}
-                >
-                  {z === 'TODAS' ? 'Todas las Zonas' : `Zona ${z}`}
-                </button>
-              ))}
-            </div>
-            <div className="w-px h-5 mx-2" style={{ background: 'var(--dark-border)' }} />
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFiltroFecha('TODAS')}
-                className={`px-3 py-1 rounded text-sm font-medium transition-all ${
-                  filtroFecha === 'TODAS' ? 'tab-active' : 'tab-inactive'
-                }`}
-              >
-                Todas las Fechas
-              </button>
-              {fechas.map(fn => (
+              {listaFechas.map(fn => (
                 <button
                   key={fn}
-                  onClick={() => setFiltroFecha(fn)}
-                  className={`px-3 py-1 rounded text-sm font-medium transition-all ${
-                    filtroFecha === fn ? 'tab-active' : 'tab-inactive'
+                  onClick={() => setFechaActiva(fn)}
+                  className={`px-6 py-2 rounded-lg text-lg font-black transition-all flex flex-col items-center min-w-[100px] ${
+                    fechaActiva === fn ? 'tab-active' : 'tab-inactive bg-white/5'
                   }`}
+                  style={{ fontFamily: 'Oswald, sans-serif' }}
                 >
-                  F{fn}
+                  <span className="text-[8px] opacity-60 tracking-widest font-black">FECHA 0{fn}</span>
                 </button>
               ))}
             </div>
+            <div className="px-4 text-right">
+                <div className="text-sm font-black text-white italic" style={{ fontFamily: 'Oswald' }}>FICHA DE TRANSMISIÓN</div>
+            </div>
           </div>
 
-          {/* Tabla de cronograma */}
-          <div className="glass-card overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--dark-border)', background: 'rgba(255,255,255,0.03)' }}>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>TURNO</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>ZONA</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>FECHA</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>FECHA CALENDARIO</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>LOCAL</th>
-                  <th className="px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>—</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>VISITANTE</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>ASIGNAR TURNO</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>ESTADO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {partidosFiltrados.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="text-center py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      No hay partidos con los filtros seleccionados
-                    </td>
+          {/* Ficha Principal (Ajustada para No Scroll) */}
+          <div className="glass-card flex-1 overflow-hidden shadow-2xl border border-white/5 flex flex-col" style={{ background: 'rgba(13,17,23,0.6)', borderRadius: '16px' }}>
+            <div className="px-8 py-3 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                <h2 className="text-2xl font-black uppercase italic tracking-tighter" style={{ fontFamily: 'Oswald' }}>
+                   FECHA {fechaActiva} · CRONOGRAMA OFICIAL
+                </h2>
+            </div>
+
+            <div className="flex-1 overflow-hidden">
+              <table className="w-full h-full text-left" style={{ tableLayout: 'fixed' }}>
+                <thead>
+                  <tr className="bg-white/5">
+                    <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500 text-center w-[120px]">HORARIO</th>
+                    <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500 text-center w-[130px]">ZONA</th>
+                    <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500">EQUIPO LOCAL</th>
+                    <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500">EQUIPO VISITANTE</th>
+                    <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500 text-center w-[200px]">RESULTADO</th>
                   </tr>
-                ) : (
-                  partidosFiltrados
-                    .sort((a, b) => {
-                      if (a.fecha_numero !== b.fecha_numero) return a.fecha_numero - b.fecha_numero;
-                      return a.zona.localeCompare(b.zona);
-                    })
-                    .map(p => {
-                      const local = getEquipoById(p.id_local);
-                      const visitante = getEquipoById(p.id_visitante);
-                      const style = ZONA_STYLES[p.zona];
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {partidosHoy.map((p) => {
+                    const local = getEquipoById(p.id_local);
+                    const visitante = getEquipoById(p.id_visitante);
+                    const badgeClass = ZONA_STYLES[p.zona];
+                    const esJugado = p.estado === 'jugado';
 
+                    return (
+                      <tr key={p.id_partido} className="hover:bg-white/2">
+                        <td className="px-6 py-2 text-center">
+                           <span className="text-xl font-black text-gold italic" style={{ fontFamily: 'Oswald' }}>{p.turno_horario}</span>
+                        </td>
+                        <td className="px-6 py-2">
+                           <div className="flex justify-center">
+                             <div className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase text-center ${badgeClass}`} style={{ minWidth: '80px' }}>
+                               ZONA {p.zona}
+                             </div>
+                           </div>
+                        </td>
+                        <td className="px-6 py-2 text-xl font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald' }}>
+                           <div className="flex items-center gap-3">
+                              <div className="w-1.5 h-6 rounded-full" style={{ background: local?.color || '#374151' }} />
+                              {local?.nombre.toUpperCase() || '—'}
+                           </div>
+                        </td>
+                        <td className="px-6 py-2 text-xl font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald' }}>
+                           <div className="flex items-center gap-3">
+                              <div className="w-1.5 h-6 rounded-full" style={{ background: visitante?.color || '#374151' }} />
+                              {visitante?.nombre.toUpperCase() || '—'}
+                           </div>
+                        </td>
+                        <td className="px-6 py-2 text-center text-xl font-black italic uppercase" style={{ fontFamily: 'Oswald' }}>
+                           {esJugado ? (
+                               <span className="text-green-400">{p.goles_local} — {p.goles_visitante}</span>
+                           ) : (
+                             <span className="text-yellow-500/60 text-lg">PENDIENTE</span>
+                           )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Libres Compactos */}
+            <div className="px-8 py-3 border-t border-white/5 bg-black/20">
+                <div className="flex justify-center items-center gap-12">
+                   <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest mr-4">DESCANSAN:</span>
+                    {libresHoyCalculados.map(l => {
+                      const badgeClass = ZONA_STYLES[l.zona];
                       return (
-                        <tr
-                          key={p.id_partido}
-                          className="match-row"
-                          style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
-                        >
-                          {/* Turno */}
-                          <td className="px-4 py-3">
-                            <div
-                              className="font-bold text-sm"
-                              style={{
-                                color: p.turno_horario ? 'var(--gold)' : 'var(--text-secondary)',
-                                fontFamily: 'Oswald, sans-serif',
-                                minWidth: '60px',
-                              }}
-                            >
-                              {p.turno_horario ?? '—:——'}
-                            </div>
-                          </td>
-
-                          {/* Zona */}
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${style.badge}`}>
-                              ZONA {p.zona}
-                            </span>
-                          </td>
-
-                          {/* Fecha número */}
-                          <td className="px-4 py-3">
-                            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                              Fecha {p.fecha_numero}
-                            </span>
-                          </td>
-
-                          {/* Fecha calendario */}
-                          <td className="px-4 py-3">
-                            <input
-                              type="date"
-                              className="input-field"
-                              style={{ minWidth: '140px', fontSize: '12px', padding: '6px 10px' }}
-                              value={p.fecha_calendario ?? ''}
-                              onChange={e => actualizarPartido(p.id_partido, 'fecha_calendario', e.target.value)}
-                            />
-                          </td>
-
-                          {/* Local */}
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs px-1.5 rounded ${style.badge}`}>{local?.codigo}</span>
-                              <span className="font-medium text-sm">{local?.nombre}</span>
-                            </div>
-                          </td>
-
-                          {/* VS */}
-                          <td className="px-4 py-3 text-center text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>VS</td>
-
-                          {/* Visitante */}
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs px-1.5 rounded ${style.badge}`}>{visitante?.codigo}</span>
-                              <span className="font-medium text-sm">{visitante?.nombre}</span>
-                            </div>
-                          </td>
-
-                          {/* Selector de turno */}
-                          <td className="px-4 py-3">
-                            <select
-                              className="input-field"
-                              style={{ minWidth: '110px', fontSize: '12px', padding: '6px 10px' }}
-                              value={p.turno_horario ?? ''}
-                              onChange={e => actualizarPartido(p.id_partido, 'turno_horario', e.target.value)}
-                            >
-                              <option value="">Sin turno</option>
-                              {HORARIOS_DISPONIBLES.map(h => (
-                                <option key={h} value={h}>{h} hs</option>
-                              ))}
-                            </select>
-                          </td>
-
-                          {/* Estado */}
-                          <td className="px-4 py-3">
-                            <span className={p.estado === 'jugado' ? 'status-played' : 'status-pending'}>
-                              {p.estado === 'jugado' ? 'Jugado' : 'Pendiente'}
-                            </span>
-                          </td>
-                        </tr>
+                        <div key={l.zona} className="flex items-center gap-3">
+                           <span className={`px-2 py-0.5 rounded text-[8px] font-black ${badgeClass}`}>ZONA {l.zona}</span>
+                           <span className="text-lg font-black tracking-tight uppercase text-gold" style={{ fontFamily: 'Oswald' }}>
+                              {l.equipo ? l.equipo.nombre.toUpperCase() : '...'}
+                           </span>
+                        </div>
                       );
-                    })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Botón exportar JSON */}
-          <div className="flex justify-end">
-            <button
-              className="btn-primary"
-              onClick={() => {
-                const data = JSON.stringify({ equipos, partidos }, null, 2);
-                const blob = new Blob([data], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `torneo-veteranos-${new Date().toISOString().slice(0, 10)}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-            >
-              ↓ Exportar JSON
-            </button>
+                    })}
+                </div>
+            </div>
           </div>
         </>
       )}
