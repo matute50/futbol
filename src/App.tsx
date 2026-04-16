@@ -6,6 +6,8 @@ import { TabFixture } from './components/TabFixture';
 import { TabCronograma } from './components/TabCronograma';
 import { TabConsola } from './components/TabConsola';
 import { OverlayMarcador } from './components/OverlayMarcador';
+import { OverlayFixture } from './components/OverlayFixture';
+import { OverlayStandings } from './components/OverlayStandings';
 import { 
   cargarEquiposDB, 
   cargarPartidosDB, 
@@ -35,8 +37,9 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
   const [syncMsg,   setSyncMsg]    = useState('Cargando datos...');
 
-  // Simple detección de vista (overlay o dashboard)
-  const isOverlay = new URLSearchParams(window.location.search).get('view') === 'overlay';
+  // Detección de vista (overlay o dashboard)
+  const viewParam = new URLSearchParams(window.location.search).get('view');
+  const isOverlay = !!viewParam;
 
   // ── Carga inicial desde Supabase ──────────────────────────────────────────
   useEffect(() => {
@@ -163,7 +166,15 @@ export default function App() {
   };
 
   if (isOverlay) {
-    return <OverlayMarcador />;
+    return (
+      <>
+        <style>{`body { background: transparent !important; overflow: hidden; }`}</style>
+        {viewParam === 'marcador' && <OverlayMarcador />}
+        {viewParam === 'fixture' && <OverlayFixture />}
+        {viewParam === 'tablas' && <OverlayStandings />}
+        {!['marcador', 'fixture', 'tablas'].includes(viewParam || '') && <OverlayMarcador />}
+      </>
+    );
   }
 
   return (

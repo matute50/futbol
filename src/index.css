@@ -28,6 +28,8 @@ body {
   background-color: var(--dark-bg);
   color: var(--text-primary);
   min-height: 100vh;
+  text-transform: uppercase; /* Forzar mayúsculas globalmente para estilo broadcast */
+  text-shadow: 0 2px 10px rgba(0,0,0,0.8), 0 1px 3px rgba(0,0,0,0.9); /* Sombra con blur para legibilidad */
 }
 
 h1, h2, h3 {

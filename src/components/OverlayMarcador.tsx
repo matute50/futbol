@@ -71,7 +71,8 @@ export const OverlayMarcador: React.FC = () => {
 
   return (
     <div className="overlay-container" style={{
-      width: '100vw', height: '100vh', background: 'transparent', 
+      width: '100vw', height: '100vh', 
+      background: 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,1) 100%)',
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
       paddingTop: '40px', fontFamily: 'Oswald, sans-serif'
     }}>

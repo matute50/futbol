@@ -219,6 +219,7 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
 
   return (
     <div className="fade-in">
+
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px', alignItems: 'start' }}>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -347,6 +348,22 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
             })}
           </div>
         )}
+
+        {/* SECCIÓN VMIX - ENLACES RÁPIDOS (Reubicado) */}
+        <div style={{ background: 'rgba(255,166,35,0.05)', padding: '15px 24px', borderRadius: '12px', border: '1px solid rgba(245,166,35,0.2)', marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{ background: 'var(--gold)', color: 'black', padding: '4px 10px', borderRadius: '4px', fontSize: '10px', fontWeight: 900, fontFamily: 'Oswald' }}>VMIX OVERLAYS</div>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Enlaces rápidos:</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a href="marcador.html" target="_blank" className="px-3 py-1.5 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded text-xs font-bold transition-all uppercase">Marcador</a>
+            <a href="fixture.html" target="_blank" className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs font-bold transition-all uppercase">Fixture</a>
+            <a href="tablas.html" target="_blank" className="px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs font-bold transition-all uppercase">Tod. Tablas</a>
+            <a href="tabla_a.html" target="_blank" className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-300 border border-blue-600/30 rounded text-xs font-bold transition-all uppercase">Tabla A</a>
+            <a href="tabla_b.html" target="_blank" className="px-3 py-1.5 bg-green-600/10 hover:bg-green-600/20 text-green-300 border border-green-600/30 rounded text-xs font-bold transition-all uppercase">Tabla B</a>
+            <a href="tabla_c.html" target="_blank" className="px-3 py-1.5 bg-orange-600/10 hover:bg-orange-600/20 text-orange-300 border border-orange-600/30 rounded text-xs font-bold transition-all uppercase">Tabla C</a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
