@@ -6,8 +6,8 @@ export const OverlayMarcador: React.FC = () => {
   const [partido, setPartido] = useState<Partido | null>(null);
   const [equipoL, setEquipoL] = useState<Equipo | null>(null);
   const [equipoV, setEquipoV] = useState<Equipo | null>(null);
-  const [reloj] = useState('00:00');
-  const [periodo] = useState('PRIMER TIEMPO');
+  const [reloj, setReloj] = useState('00:00');
+  const [periodo, setPeriodo] = useState('PRIMER TIEMPO');
 
   const fetchActiveMatch = async () => {
     const { data: pts, error } = await supabase
@@ -60,6 +60,12 @@ export const OverlayMarcador: React.FC = () => {
         { event: 'UPDATE', schema: 'public', table: 'equipos' }, 
         () => fetchActiveMatch()
       )
+      .on('broadcast', { event: 'reloj' }, (payload) => {
+        setReloj(payload.payload.reloj);
+      })
+      .on('broadcast', { event: 'periodo' }, (payload) => {
+        setPeriodo(payload.payload.periodo);
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -72,7 +78,7 @@ export const OverlayMarcador: React.FC = () => {
   return (
     <div className="overlay-container" style={{
       width: '100vw', height: '100vh', 
-      background: 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,1) 100%)',
+      background: 'transparent',
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
       paddingTop: '40px', fontFamily: 'Oswald, sans-serif'
     }}>
@@ -82,10 +88,12 @@ export const OverlayMarcador: React.FC = () => {
         border: '1px solid rgba(255,255,255,0.1)', height: '60px'
       }}>
         <div style={{
-          background: '#222', padding: '0 20px', display: 'flex', alignItems: 'center', 
-          fontSize: '14px', fontWeight: 700, borderRight: '1px solid #444', color: '#f5a623'
+          background: '#000', padding: '0 15px', display: 'flex', flexDirection: 'column', 
+          alignItems: 'center', justifyContent: 'center', 
+          borderRight: '1px solid rgba(255,255,255,0.1)', color: '#f5a623'
         }}>
-          ZONA {partido.zona}
+          <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8 }}>ZONA</span>
+          <span style={{ fontSize: '32px', fontWeight: 900, lineHeight: 0.9 }}>{partido.zona}</span>
         </div>
 
         <div style={{
@@ -95,7 +103,8 @@ export const OverlayMarcador: React.FC = () => {
           padding: '0 25px', display: 'flex', alignItems: 'center',
           minWidth: '180px', justifyContent: 'flex-end', textShadow: '0 1px 3px rgba(0,0,0,0.8)',
           boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
-          color: equipoL.color_texto ?? 'white'
+          color: equipoL.color_texto ?? 'white',
+          borderBottom: `6px solid ${equipoL.color || 'transparent'}`
         }}>
           <span style={{ fontSize: '26px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
             {equipoL.nombre}
@@ -103,7 +112,7 @@ export const OverlayMarcador: React.FC = () => {
         </div>
 
         <div style={{
-          background: '#0a0a0a', padding: '0 25px', display: 'flex', alignItems: 'center', 
+          background: '#000', padding: '0 25px', display: 'flex', alignItems: 'center', 
           justifyContent: 'center', fontSize: '38px', fontWeight: 900, minWidth: '70px',
           borderRight: '2px solid rgba(255,255,255,0.1)'
         }}>
@@ -113,7 +122,7 @@ export const OverlayMarcador: React.FC = () => {
         <div style={{ background: '#fff', width: '2px' }} />
 
         <div style={{
-          background: '#0a0a0a', padding: '0 25px', display: 'flex', alignItems: 'center', 
+          background: '#000', padding: '0 25px', display: 'flex', alignItems: 'center', 
           justifyContent: 'center', fontSize: '38px', fontWeight: 900, minWidth: '70px',
           borderLeft: '2px solid rgba(255,255,255,0.1)'
         }}>
@@ -127,7 +136,8 @@ export const OverlayMarcador: React.FC = () => {
           padding: '0 25px', display: 'flex', alignItems: 'center',
           minWidth: '180px', justifyContent: 'flex-start', textShadow: '0 1px 3px rgba(0,0,0,0.8)',
           boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
-          color: equipoV.color_texto ?? 'white'
+          color: equipoV.color_texto ?? 'white',
+          borderBottom: `6px solid ${equipoV.color || 'transparent'}`
         }}>
           <span style={{ fontSize: '26px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
             {equipoV.nombre}
@@ -135,8 +145,9 @@ export const OverlayMarcador: React.FC = () => {
         </div>
 
         <div style={{
-          background: '#f5a623', color: '#000', padding: '0 20px', display: 'flex', 
-          flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '120px'
+          background: '#000', color: '#f5a623', padding: '0 20px', display: 'flex', 
+          flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '120px',
+          borderLeft: '1px solid rgba(255,255,255,0.1)'
         }}>
           <div style={{ fontSize: '24px', fontWeight: 900, lineHeight: 1.1 }}>{reloj}</div>
           <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{periodo}</div>

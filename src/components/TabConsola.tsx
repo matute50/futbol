@@ -62,7 +62,17 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
     let interval: any;
     if (isTimerRunning) {
       interval = setInterval(() => {
-        setSegundos(s => s + 1);
+        setSegundos(s => {
+          const nuevo = s + 1;
+          // Broadcast del reloj
+          const msg = formatTiempo(nuevo);
+          supabase.channel('broadcast-scoreboard').send({
+            type: 'broadcast',
+            event: 'reloj',
+            payload: { reloj: msg }
+          });
+          return nuevo;
+        });
       }, 1000);
     } else {
       clearInterval(interval);
@@ -108,6 +118,9 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
     setColorVisita1(cV1); setColorVisita2(cV2); setTextColorVisita(tV);
     
     try {
+      // "Tocar" el partido en Supabase para que el overlay lo detecte como el más reciente
+      await supabase.from('partidos').update({ updated_at: new Date().toISOString() }).eq('id_partido', p.id_partido);
+
       await precargarPartido({
         nombreLocal: getNombre(p.id_local).toUpperCase(),
         nombreVisita: getNombre(p.id_visitante).toUpperCase(),
@@ -115,8 +128,24 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
         colorLocal: cL1, colorLocal2: cL2, colorTextoLocal: tL,
         colorVisita: cV1, colorVisita2: cV2, colorTextoVisita: tV,
       });
+
+      // Sincronizar overlay web inmediatamente
+      supabase.channel('broadcast-scoreboard').send({
+        type: 'broadcast',
+        event: 'reloj',
+        payload: { reloj: '00:00' }
+      });
+      supabase.channel('broadcast-scoreboard').send({
+        type: 'broadcast',
+        event: 'periodo',
+        payload: { periodo: '—' } // '—' es el estado 'pre'
+      });
+
       showStatus('ok', 'Partido listo');
-    } catch { showStatus('error', 'Error vMix'); }
+    } catch (e) { 
+      console.error(e);
+      showStatus('error', 'Error al sincronizar'); 
+    }
   }, [equipos]);
 
   const cambiarGol = useCallback(async (equipo: 'local' | 'visita', delta: 1 | -1) => {
@@ -124,11 +153,17 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
     if (equipo === 'local') {
       const nuevo = Math.max(0, golesLocal + delta);
       setGolesLocal(nuevo);
-      await setGoalLocal(nuevo).catch(() => showStatus('error', 'Error vMix'));
+      await Promise.all([
+        setGoalLocal(nuevo),
+        supabase.from('partidos').update({ goles_local: nuevo }).eq('id_partido', partidoSel.id_partido)
+      ]).catch(() => showStatus('error', 'Error de sincronización'));
     } else {
       const nuevo = Math.max(0, golesVisita + delta);
       setGolesVisita(nuevo);
-      await setGoalVisita(nuevo).catch(() => showStatus('error', 'Error vMix'));
+      await Promise.all([
+        setGoalVisita(nuevo),
+        supabase.from('partidos').update({ goles_visitante: nuevo }).eq('id_partido', partidoSel.id_partido)
+      ]).catch(() => showStatus('error', 'Error de sincronización'));
     }
   }, [partidoSel, golesLocal, golesVisita]);
 
@@ -141,12 +176,26 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
       await ejecutarCiclo(VMIX_CICLO_MAP[estadoJuego]);
       setEstadoJuego(siguiente);
       
+      // Broadcast del periodo
+      supabase.channel('broadcast-scoreboard').send({
+        type: 'broadcast',
+        event: 'periodo',
+        payload: { periodo: PERIODO_DISPLAY[siguiente] }
+      });
+
       // Control de reloj automático
       if (siguiente === 'primer_tiempo' || siguiente === 'segundo_tiempo') {
         setIsTimerRunning(true);
       } else {
         setIsTimerRunning(false);
-        if (siguiente === 'entretiempo') setSegundos(0);
+        if (siguiente === 'entretiempo') {
+          setSegundos(0);
+          supabase.channel('broadcast-scoreboard').send({
+            type: 'broadcast',
+            event: 'reloj',
+            payload: { reloj: '00:00' }
+          });
+        }
       }
 
       if (siguiente === 'finalizado') {
