@@ -9,6 +9,9 @@ export const OverlayMarcador: React.FC = () => {
   const [reloj, setReloj] = useState('00:00');
   const [periodo, setPeriodo] = useState('PRIMER TIEMPO');
 
+  const [animL, setAnimL] = useState(false);
+  const [animV, setAnimV] = useState(false);
+
   const fetchActiveMatch = async () => {
     const { data: pts, error } = await supabase
       .from('partidos')
@@ -66,6 +69,24 @@ export const OverlayMarcador: React.FC = () => {
       .on('broadcast', { event: 'periodo' }, (payload) => {
         setPeriodo(payload.payload.periodo);
       })
+      .on('broadcast', { event: 'goles' }, (payload) => {
+        setPartido(prev => {
+          if (!prev) return null;
+          if (payload.payload.goles_local > prev.goles_local) {
+            setAnimL(true);
+            setTimeout(() => setAnimL(false), 1500);
+          }
+          if (payload.payload.goles_visitante > prev.goles_visitante) {
+            setAnimV(true);
+            setTimeout(() => setAnimV(false), 1500);
+          }
+          return { 
+            ...prev, 
+            goles_local: payload.payload.goles_local, 
+            goles_visitante: payload.payload.goles_visitante 
+          };
+        });
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -82,9 +103,24 @@ export const OverlayMarcador: React.FC = () => {
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
       paddingTop: '40px', fontFamily: 'Oswald, sans-serif'
     }}>
+      <style>{`
+        @keyframes splash-gol {
+          0% { transform: scale(1); background: #000; color: #fff; }
+          15% { transform: scale(1.6); background: #f5a623; color: #000; box-shadow: 0 0 50px #f5a623; }
+          30% { transform: scale(1.3); background: #f5a623; color: #000; }
+          45% { transform: scale(1.4); background: #f5a623; color: #000; }
+          100% { transform: scale(1); background: #000; color: #fff; }
+        }
+        .anim-gol {
+          animation: splash-gol 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+          position: relative;
+          z-index: 50;
+        }
+      `}</style>
+
       <div className="scoreboard-bar" style={{
         display: 'flex', alignItems: 'stretch', background: '#000', color: '#fff',
-        borderRadius: '4px', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+        borderRadius: '4px', overflow: 'visible', boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
         border: '1px solid rgba(255,255,255,0.1)', height: '60px'
       }}>
         <div style={{
@@ -111,20 +147,22 @@ export const OverlayMarcador: React.FC = () => {
           </span>
         </div>
 
-        <div style={{
+        <div className={animL ? 'anim-gol' : ''} style={{
           background: '#000', padding: '0 25px', display: 'flex', alignItems: 'center', 
           justifyContent: 'center', fontSize: '38px', fontWeight: 900, minWidth: '70px',
-          borderRight: '2px solid rgba(255,255,255,0.1)'
+          borderRight: '2px solid rgba(255,255,255,0.1)',
+          transition: 'all 0.3s ease'
         }}>
           {partido.goles_local}
         </div>
 
-        <div style={{ background: '#fff', width: '2px' }} />
+        <div style={{ background: '#fff', width: '2px', zIndex: 5 }} />
 
-        <div style={{
+        <div className={animV ? 'anim-gol' : ''} style={{
           background: '#000', padding: '0 25px', display: 'flex', alignItems: 'center', 
           justifyContent: 'center', fontSize: '38px', fontWeight: 900, minWidth: '70px',
-          borderLeft: '2px solid rgba(255,255,255,0.1)'
+          borderLeft: '2px solid rgba(255,255,255,0.1)',
+          transition: 'all 0.3s ease'
         }}>
           {partido.goles_visitante}
         </div>

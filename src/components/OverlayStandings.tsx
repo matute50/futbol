@@ -23,7 +23,8 @@ export const OverlayStandings: React.FC = () => {
 
     const fetchData = async () => {
         const { data: eqs } = await supabase.from('equipos').select('*');
-        const { data: pts } = await supabase.from('partidos').select('*').eq('estado', 'jugado');
+        // Traer todos los partidos para incluir los que están "en vivo" (pendientes pero con goles cargados)
+        const { data: pts } = await supabase.from('partidos').select('*');
         if (eqs) setEquipos(eqs);
         if (pts) setPartidos(pts as any[]);
         setLoading(false);
@@ -31,7 +32,13 @@ export const OverlayStandings: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-        const channel = supabase.channel('broadcast-standings').on('postgres_changes', { event: '*', schema: 'public', table: 'partidos' }, fetchData).subscribe();
+        const channel = supabase.channel('broadcast-scoreboard')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'partidos' }, fetchData)
+            .on('broadcast', { event: 'goles' }, () => {
+                // Forzar refresco inmediato de los datos al recibir un broadcast de gol
+                fetchData();
+            })
+            .subscribe();
         return () => { supabase.removeChannel(channel); };
     }, []);
 
@@ -40,9 +47,10 @@ export const OverlayStandings: React.FC = () => {
 
     if (loading) return null;
 
-    const calcularTabla = (zona: 'A' | 'B' | 'C'): FilaTabla[] => {
+    const calcularTabla = (zona: 'A' | 'B' | 'C'): { filas: FilaTabla[], equiposLive: Set<string> } => {
         const eqsZona = equipos.filter(e => e.zona === zona);
         const tabla: Record<string, FilaTabla> = {};
+        const equiposLive = new Set<string>();
 
         eqsZona.forEach(e => {
             tabla[e.id] = { 
@@ -54,6 +62,12 @@ export const OverlayStandings: React.FC = () => {
         partidos.filter(p => p.zona === zona).forEach(p => {
             if (!p.id_local || !p.id_visitante || p.goles_local === null || p.goles_visitante === null) return;
             
+            // Si el partido está en curso (tiene goles pero no está finalizado)
+            if (p.estado !== 'jugado') {
+                equiposLive.add(p.id_local);
+                equiposLive.add(p.id_visitante);
+            }
+
             const gl = p.goles_local;
             const gv = p.goles_visitante;
 
@@ -80,13 +94,15 @@ export const OverlayStandings: React.FC = () => {
             }
         });
 
-        return Object.values(tabla)
+        const filas = Object.values(tabla)
             .map(t => ({ ...t, dg: t.gf - t.gc }))
             .sort((a, b) => b.pts - a.pts || b.dg - a.dg || b.gf - a.gf);
+
+        return { filas, equiposLive };
     };
 
     const RenderZona = ({ zona }: { zona: 'A' | 'B' | 'C' }) => {
-        const rows = calcularTabla(zona);
+        const { filas: rows, equiposLive } = calcularTabla(zona);
         const zoneColors: Record<string, string> = {
             'A': '#3b82f6',
             'B': '#22c55e',
@@ -105,6 +121,28 @@ export const OverlayStandings: React.FC = () => {
                 flexDirection: 'column', 
                 overflow: 'hidden'
             }}>
+                <style>{`
+                    @keyframes live-pulse {
+                        0% { opacity: 1; transform: scale(1); }
+                        50% { opacity: 0.5; transform: scale(0.95); }
+                        100% { opacity: 1; transform: scale(1); }
+                    }
+                    .live-badge {
+                        background: #ef4444;
+                        color: white;
+                        font-size: 14px;
+                        padding: 2px 8px;
+                        border-radius: 4px;
+                        font-weight: 900;
+                        animation: live-pulse 1.5s infinite;
+                        margin-left: 10px;
+                        vertical-align: middle;
+                        text-shadow: none;
+                    }
+                    .row-live {
+                        background: rgba(239, 68, 68, 0.05);
+                    }
+                `}</style>
                 <div style={{ padding: '0' }}>
                     <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', fontSize: '28px' }}>
                         <thead>
@@ -117,20 +155,24 @@ export const OverlayStandings: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {rows.map((r, idx) => (
-                                <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                    <td style={{ padding: '8px 20px 8px 25px', textAlign: 'right' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '20px' }}>
-                                            <span style={{ opacity: 0.4 }}>{idx + 1}</span>
-                                            <span style={{ fontWeight: 800, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{r.nombre}</span>
-                                        </div>
-                                    </td>
-                                    <td style={{ textAlign: 'center', padding: '10px', color: '#f5a623', fontWeight: 700 }}>{r.pj}</td>
-                                    <td style={{ textAlign: 'center', padding: '10px', color: '#f5a623', fontWeight: 700 }}>{r.pg}</td>
-                                    <td style={{ textAlign: 'center', fontWeight: 900, color: color, padding: '10px' }}>{r.pts}</td>
-                                    <td style={{ textAlign: 'center', padding: '10px', color: '#f5a623', fontWeight: 700 }}>{r.dg > 0 ? `+${r.dg}` : r.dg}</td>
-                                </tr>
-                            ))}
+                            {rows.map((r, idx) => {
+                                const isLive = equiposLive.has(r.id);
+                                return (
+                                    <tr key={r.id} className={isLive ? 'row-live' : ''} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                        <td style={{ padding: '8px 20px 8px 25px', textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '20px' }}>
+                                                {isLive && <span className="live-badge">LIVE</span>}
+                                                <span style={{ opacity: 0.4 }}>{idx + 1}</span>
+                                                <span style={{ fontWeight: 800, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{r.nombre}</span>
+                                            </div>
+                                        </td>
+                                        <td style={{ textAlign: 'center', padding: '10px', color: '#f5a623', fontWeight: 700 }}>{r.pj}</td>
+                                        <td style={{ textAlign: 'center', padding: '10px', color: '#f5a623', fontWeight: 700 }}>{r.pg}</td>
+                                        <td style={{ textAlign: 'center', fontWeight: 900, color: color, padding: '10px' }}>{r.pts}</td>
+                                        <td style={{ textAlign: 'center', padding: '10px', color: '#f5a623', fontWeight: 700 }}>{r.dg > 0 ? `+${r.dg}` : r.dg}</td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

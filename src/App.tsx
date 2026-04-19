@@ -92,11 +92,14 @@ export default function App() {
     };
     cargar();
 
-    // Suscripción en tiempo real para equipos
+    // Suscripciones en tiempo real
     const channel = supabase
-      .channel('db-changes')
+      .channel('db-all-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'equipos' }, () => {
         cargarEquiposDB().then(setEquipos);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partidos' }, () => {
+        cargarPartidosDB().then(setPartidos);
       })
       .subscribe();
 
@@ -145,13 +148,13 @@ export default function App() {
   }, []);
 
   // ── Partido finalizado desde la Consola ───────────────────────────────────
-  const handlePartidoFinalizado = useCallback((idPartido: string, golesLocal: number, golesVisita: number) => {
+  const handlePartidoFinalizado = useCallback((idPartido: string, golesLocal: number | null, golesVisita: number | null, estado: 'pendiente' | 'jugado' = 'jugado') => {
     setPartidos(prev => prev.map(p =>
       p.id_partido === idPartido
-        ? { ...p, goles_local: golesLocal, goles_visitante: golesVisita, estado: 'jugado' }
+        ? { ...p, goles_local: golesLocal, goles_visitante: golesVisita, estado: estado }
         : p
     ));
-    mostrarOk('Resultado guardado ✓');
+    mostrarOk(estado === 'jugado' ? 'Resultado guardado ✓' : 'Partido reiniciado ✓');
   }, []);
 
 

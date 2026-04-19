@@ -16,7 +16,7 @@ import {
 interface Props {
   equipos: Equipo[];
   partidos: Partido[];
-  onPartidoFinalizado: (idPartido: string, golesLocal: number, golesVisita: number) => void;
+  onPartidoFinalizado: (idPartido: string, golesLocal: number | null, golesVisita: number | null, estado?: 'pendiente' | 'jugado') => void;
 }
 
 type EstadoPartido = 'pre' | 'primer_tiempo' | 'entretiempo' | 'segundo_tiempo' | 'finalizado';
@@ -150,20 +150,38 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
 
   const cambiarGol = useCallback(async (equipo: 'local' | 'visita', delta: 1 | -1) => {
     if (!partidoSel) return;
+    
+    let nL = golesLocal;
+    let nV = golesVisita;
+
     if (equipo === 'local') {
-      const nuevo = Math.max(0, golesLocal + delta);
-      setGolesLocal(nuevo);
-      await Promise.all([
-        setGoalLocal(nuevo),
-        supabase.from('partidos').update({ goles_local: nuevo }).eq('id_partido', partidoSel.id_partido)
-      ]).catch(() => showStatus('error', 'Error de sincronización'));
+      nL = Math.max(0, golesLocal + delta);
+      setGolesLocal(nL);
     } else {
-      const nuevo = Math.max(0, golesVisita + delta);
-      setGolesVisita(nuevo);
+      nV = Math.max(0, golesVisita + delta);
+      setGolesVisita(nV);
+    }
+
+    // Broadcast inmediato para el overlay web
+    supabase.channel('broadcast-scoreboard').send({
+      type: 'broadcast',
+      event: 'goles',
+      payload: { goles_local: nL, goles_visitante: nV }
+    });
+
+    // Sincronización con vMix y Supabase
+    try {
       await Promise.all([
-        setGoalVisita(nuevo),
-        supabase.from('partidos').update({ goles_visitante: nuevo }).eq('id_partido', partidoSel.id_partido)
-      ]).catch(() => showStatus('error', 'Error de sincronización'));
+        equipo === 'local' ? setGoalLocal(nL) : setGoalVisita(nV),
+        supabase.from('partidos').update({ 
+          goles_local: nL, 
+          goles_visitante: nV,
+          updated_at: new Date().toISOString() 
+        }).eq('id_partido', partidoSel.id_partido)
+      ]);
+    } catch (e) {
+      console.error(e);
+      showStatus('error', 'Error de sincronización');
     }
   }, [partidoSel, golesLocal, golesVisita]);
 
@@ -184,18 +202,17 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
       });
 
       // Control de reloj automático
-      if (siguiente === 'primer_tiempo' || siguiente === 'segundo_tiempo') {
+      if (siguiente === 'primer_tiempo' || siguiente === 'entretiempo' || siguiente === 'segundo_tiempo') {
+        setSegundos(0);
         setIsTimerRunning(true);
+        // Sincronización inmediata de reloj a cero
+        supabase.channel('broadcast-scoreboard').send({
+          type: 'broadcast',
+          event: 'reloj',
+          payload: { reloj: '00:00' }
+        });
       } else {
         setIsTimerRunning(false);
-        if (siguiente === 'entretiempo') {
-          setSegundos(0);
-          supabase.channel('broadcast-scoreboard').send({
-            type: 'broadcast',
-            event: 'reloj',
-            payload: { reloj: '00:00' }
-          });
-        }
       }
 
       if (siguiente === 'finalizado') {
@@ -242,14 +259,21 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
         colorVisita: colorVisita1, colorVisita2: colorVisita2, colorTextoVisita: textColorVisita,
       });
 
-      // Supabase
+      // Sincronizar overlay web inmediatamente
+      const channel = supabase.channel('broadcast-scoreboard');
+      channel.send({ type: 'broadcast', event: 'goles', payload: { goles_local: 0, goles_visitante: 0 } });
+      channel.send({ type: 'broadcast', event: 'reloj', payload: { reloj: '00:00' } });
+      channel.send({ type: 'broadcast', event: 'periodo', payload: { periodo: '—' } });
+
+      // Supabase: poner goles en NULL para que las tablas de posiciones lo ignoren por completo
       await supabase.from('partidos').update({ 
-        goles_local: 0, 
-        goles_visitante: 0, 
-        estado: 'pendiente' 
+        goles_local: null, 
+        goles_visitante: null, 
+        estado: 'pendiente',
+        updated_at: new Date().toISOString()
       }).eq('id_partido', partidoSel.id_partido);
 
-      onPartidoFinalizado(partidoSel.id_partido, 0, 0); 
+      onPartidoFinalizado(partidoSel.id_partido, null, null, 'pendiente'); 
       showStatus('ok', 'Partido reiniciado');
     } catch {
       showStatus('error', 'Error al reiniciar');
