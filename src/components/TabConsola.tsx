@@ -359,6 +359,8 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
                    <button 
                      onClick={() => setIsTimerRunning(!isTimerRunning)} 
                      disabled={estadoJuego === 'pre' || estadoJuego === 'finalizado' || estadoJuego === 'entretiempo'}
+                     tabIndex={-1}
+                     onKeyDown={e => e.preventDefault()}
                      style={{ 
                        background: 'transparent', border: 'none', cursor: 'pointer',
                        display: 'flex', flexDirection: 'column', alignItems: 'center'
@@ -382,12 +384,18 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
              </div>
 
              <div className="flex gap-4">
-                <button onClick={avanzarCiclo} disabled={estadoJuego === 'finalizado'} style={{
-                  flex: 1, padding: '16px', borderRadius: '12px', fontSize: '20px', fontWeight: 900,
-                  background: estadoJuego === 'finalizado' ? '#1f2937' : `linear-gradient(135deg, ${cicloInfo.color}, #000)`,
-                  color: 'white', border: `2px solid ${cicloInfo.color}`, cursor: 'pointer', transition: 'all 0.2s',
-                  fontFamily: 'Oswald', letterSpacing: '2px'
-                }}>
+                <button 
+                  onClick={avanzarCiclo} 
+                  disabled={estadoJuego === 'finalizado'} 
+                  tabIndex={-1}
+                  onKeyDown={e => e.preventDefault()}
+                  style={{
+                    flex: 1, padding: '16px', borderRadius: '12px', fontSize: '20px', fontWeight: 900,
+                    background: estadoJuego === 'finalizado' ? '#1f2937' : `linear-gradient(135deg, ${cicloInfo.color}, #000)`,
+                    color: 'white', border: `2px solid ${cicloInfo.color}`, cursor: 'pointer', transition: 'all 0.2s',
+                    fontFamily: 'Oswald', letterSpacing: '2px'
+                  }}
+                >
                   {cicloInfo.icon} {cicloInfo.label}
                 </button>
                 
@@ -456,8 +464,20 @@ const GoalControl = ({ name, goles, c1, c2, textColor, onMas, onMenos, disabled 
     </div>
     <div style={{ fontSize: '180px', fontWeight: 900, fontFamily: 'Oswald', color: disabled ? '#1f2937' : 'white', lineHeight: 1 }}>{goles}</div>
     <div className="flex gap-4">
-      <button onClick={onMenos} disabled={disabled || goles === 0} style={{ width: '54px', height: '54px', borderRadius: '12px', background: '#ef444415', border: '1px solid #ef444444', color: '#ef4444', fontSize: '20px', fontWeight: 900, cursor: 'pointer' }}>−</button>
-      <button onClick={onMas} disabled={disabled} style={{ width: '54px', height: '54px', borderRadius: '12px', background: '#22c55e15', border: '1px solid #22c55e44', color: '#22c55e', fontSize: '20px', fontWeight: 900, cursor: 'pointer' }}>+</button>
+      <button 
+        onClick={onMenos} 
+        disabled={disabled || goles === 0} 
+        tabIndex={-1}
+        onKeyDown={e => e.preventDefault()}
+        style={{ width: '54px', height: '54px', borderRadius: '12px', background: '#ef444415', border: '1px solid #ef444444', color: '#ef4444', fontSize: '20px', fontWeight: 900, cursor: 'pointer' }}
+      >−</button>
+      <button 
+        onClick={onMas} 
+        disabled={disabled} 
+        tabIndex={-1}
+        onKeyDown={e => e.preventDefault()}
+        style={{ width: '54px', height: '54px', borderRadius: '12px', background: '#22c55e15', border: '1px solid #22c55e44', color: '#22c55e', fontSize: '20px', fontWeight: 900, cursor: 'pointer' }}
+      >+</button>
     </div>
   </div>
 );

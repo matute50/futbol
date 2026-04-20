@@ -109,34 +109,34 @@ export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
                     const esJugado = p.estado === 'jugado';
 
                     return (
-                      <tr key={p.id_partido} className="hover:bg-white/2">
+                      <tr key={p.id_partido} className="hover:bg-white/2" style={{ borderLeft: '4px solid var(--gold)' }}>
                         <td className="px-6 py-2 text-center">
-                           <span className="text-xl font-black text-gold italic" style={{ fontFamily: 'Oswald' }}>{p.turno_horario}</span>
+                           <span className="font-black text-gold italic" style={{ fontFamily: 'Oswald', fontSize: '23px' }}>{p.turno_horario}</span>
                         </td>
                         <td className="px-6 py-2">
                            <div className="flex justify-center">
-                             <div className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase text-center ${badgeClass}`} style={{ minWidth: '80px' }}>
+                             <div className={`px-3 py-1 rounded-lg font-black tracking-widest uppercase text-center ${badgeClass}`} style={{ minWidth: '92px', fontSize: '11.5px' }}>
                                ZONA {p.zona}
                              </div>
                            </div>
                         </td>
-                        <td className="px-6 py-2 text-xl font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald' }}>
+                        <td className="px-6 py-2 font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald', fontSize: '28px' }}>
                            <div className="flex items-center gap-3">
                               <div className="w-1.5 h-6 rounded-full" style={{ background: local?.color || '#374151' }} />
                               {local?.nombre.toUpperCase() || '—'}
                            </div>
                         </td>
-                        <td className="px-6 py-2 text-xl font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald' }}>
+                        <td className="px-6 py-2 font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald', fontSize: '28px' }}>
                            <div className="flex items-center gap-3">
                               <div className="w-1.5 h-6 rounded-full" style={{ background: visitante?.color || '#374151' }} />
                               {visitante?.nombre.toUpperCase() || '—'}
                            </div>
                         </td>
-                        <td className="px-6 py-2 text-center text-xl font-black italic uppercase" style={{ fontFamily: 'Oswald' }}>
+                        <td className="px-6 py-2 text-center font-black italic uppercase" style={{ fontFamily: 'Oswald', fontSize: '28px' }}>
                            {esJugado ? (
                                <span className="text-green-400">{p.goles_local} — {p.goles_visitante}</span>
                            ) : (
-                             <span className="text-yellow-500/60 text-lg">PENDIENTE</span>
+                             <span className="text-yellow-500/60" style={{ fontSize: '24px' }}>PENDIENTE</span>
                            )}
                         </td>
                       </tr>
@@ -155,7 +155,7 @@ export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
                       return (
                         <div key={l.zona} className="flex items-center gap-3">
                            <span className={`px-2 py-0.5 rounded text-[8px] font-black ${badgeClass}`}>ZONA {l.zona}</span>
-                           <span className="text-lg font-black tracking-tight uppercase text-gold" style={{ fontFamily: 'Oswald' }}>
+                           <span className="font-black tracking-tight uppercase text-gold" style={{ fontFamily: 'Oswald', fontSize: '20.7px' }}>
                               {l.equipo ? l.equipo.nombre.toUpperCase() : '...'}
                            </span>
                         </div>

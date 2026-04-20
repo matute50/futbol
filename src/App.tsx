@@ -8,6 +8,7 @@ import { TabConsola } from './components/TabConsola';
 import { OverlayMarcador } from './components/OverlayMarcador';
 import { OverlayFixture } from './components/OverlayFixture';
 import { OverlayStandings } from './components/OverlayStandings';
+import { OverlayTicker } from './components/OverlayTicker';
 import { 
   cargarEquiposDB, 
   cargarPartidosDB, 
@@ -175,7 +176,8 @@ export default function App() {
         {viewParam === 'marcador' && <OverlayMarcador />}
         {viewParam === 'fixture' && <OverlayFixture />}
         {viewParam === 'tablas' && <OverlayStandings />}
-        {!['marcador', 'fixture', 'tablas'].includes(viewParam || '') && <OverlayMarcador />}
+        {viewParam === 'ticker' && <OverlayTicker />}
+        {!['marcador', 'fixture', 'tablas', 'ticker'].includes(viewParam || '') && <OverlayMarcador />}
       </>
     );
   }

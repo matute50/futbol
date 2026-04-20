@@ -71,21 +71,25 @@ export const OverlayFixture: React.FC = () => {
                         <div key={p.id_partido} style={{
                             display: 'grid', gridTemplateColumns: '55px 1fr 75px',
                             alignItems: 'center', background: 'rgba(255,255,255,0.15)',
-                            padding: '10px 15px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)',
+                            padding: '10px 15px', borderRadius: '6px', 
+                            borderLeft: '5px solid #f5a623',
+                            borderTop: '1px solid rgba(255,255,255,0.1)',
+                            borderRight: '1px solid rgba(255,255,255,0.1)',
+                            borderBottom: '1px solid rgba(255,255,255,0.1)',
                             height: '12.5%', gap: '8px'
                         }}>
                             {/* HORARIO */}
-                            <div style={{ fontWeight: 800, color: '#f5a623', fontSize: '15px' }}>{p.turno_horario}</div>
+                            <div style={{ fontWeight: 800, color: '#f5a623', fontSize: '17.25px' }}>{p.turno_horario}</div>
                             
                             {/* ENCUENTRO */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 1fr', alignItems: 'center', gap: '5px' }}>
-                                <div style={{ textAlign: 'right', fontSize: '18px', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                                <div style={{ textAlign: 'right', fontSize: '25px', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
                                     {el?.nombre}
                                 </div>
-                                <div style={{ textAlign: 'center', fontSize: '20px', fontWeight: 900, color: p.estado === 'jugado' ? '#f5a623' : 'rgba(255,255,255,0.4)' }}>
+                                <div style={{ textAlign: 'center', fontSize: '28px', fontWeight: 900, color: p.estado === 'jugado' ? '#f5a623' : 'rgba(255,255,255,0.4)' }}>
                                     {p.estado === 'jugado' ? `${p.goles_local}-${p.goles_visitante}` : 'VS'}
                                 </div>
-                                <div style={{ textAlign: 'left', fontSize: '18px', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                                <div style={{ textAlign: 'left', fontSize: '25px', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
                                     {ev?.nombre}
                                 </div>
                             </div>
@@ -94,8 +98,8 @@ export const OverlayFixture: React.FC = () => {
                             <div style={{ textAlign: 'right' }}>
                                 <span style={{ 
                                     background: zoneColors[p.zona], color: 'white', 
-                                    padding: '3px 8px', borderRadius: '4px', 
-                                    fontSize: '12px', fontWeight: 900, letterSpacing: '0.5px', whiteSpace: 'nowrap'
+                                    padding: '3.5px 9.5px', borderRadius: '4px', 
+                                    fontSize: '13.8px', fontWeight: 900, letterSpacing: '0.5px', whiteSpace: 'nowrap'
                                 }}>
                                     ZONA {p.zona}
                                 </span>
