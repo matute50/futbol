@@ -19,7 +19,7 @@ interface FilaTabla {
 export const OverlayLiveStandings: React.FC = () => {
     const [equipos, setEquipos] = useState<Equipo[]>([]);
     const [partidos, setPartidos] = useState<Partido[]>([]);
-    const [visible, setVisible] = useState(true); // FORZADO PARA DISEÑO
+    const [visible, setVisible] = useState(false);
     const [currentZona, setCurrentZona] = useState<'A' | 'B' | 'C' | null>(null);
     const [filas, setFilas] = useState<FilaTabla[]>([]);
     
@@ -138,7 +138,7 @@ export const OverlayLiveStandings: React.FC = () => {
 
                 // 3. Preparar la secuencia de visualización
                 setFilas(filasBefore);
-                // setVisible(false); // COMENTADO PARA DISEÑO
+                setVisible(false);
 
                 // Limpiar timers previos si los hubiera
                 timers.current.forEach(clearTimeout);
@@ -146,7 +146,7 @@ export const OverlayLiveStandings: React.FC = () => {
 
                 // Aparecer a los 15 segundos
                 timers.current.push(setTimeout(() => {
-                    // setVisible(true); // COMENTADO PARA DISEÑO
+                    setVisible(true);
                 }, 15000));
 
                 // Animar cambios a los 17 segundos (2s después de aparecer)
@@ -155,9 +155,9 @@ export const OverlayLiveStandings: React.FC = () => {
                 }, 17000));
 
                 // Desaparecer a los 27 segundos (12s después de aparecer)
-                /* timers.current.push(setTimeout(() => {
+                timers.current.push(setTimeout(() => {
                     setVisible(false);
-                }, 27000)); */
+                }, 27000));
 
                 // Actualizar el ref de partidos para la próxima vez
                 partidosRef.current = ptsAfter;
