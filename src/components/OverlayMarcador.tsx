@@ -12,14 +12,21 @@ export const OverlayMarcador: React.FC = () => {
   const [animL, setAnimL] = useState(false);
   const [animV, setAnimV] = useState(false);
 
-  const fetchActiveMatch = async () => {
-    const { data: pts, error } = await supabase
+  const fetchActiveMatch = async (specificId?: string) => {
+    let query = supabase
       .from('partidos')
-      .select('*')
-      .not('id_local', 'is', null)
-      .not('id_visitante', 'is', null)
-      .order('updated_at', { ascending: false })
-      .limit(1);
+      .select('*');
+    
+    if (specificId) {
+      query = query.eq('id_partido', specificId);
+    } else {
+      query = query
+        .not('id_local', 'is', null)
+        .not('id_visitante', 'is', null)
+        .order('updated_at', { ascending: false });
+    }
+
+    const { data: pts, error } = await query.limit(1);
 
     if (error || !pts || pts.length === 0) return;
     
@@ -63,6 +70,13 @@ export const OverlayMarcador: React.FC = () => {
         { event: 'UPDATE', schema: 'public', table: 'equipos' }, 
         () => fetchActiveMatch()
       )
+      .on('broadcast', { event: 'cambio-partido' }, (payload) => {
+        if (payload.payload?.id_partido) {
+          fetchActiveMatch(payload.payload.id_partido);
+        } else {
+          fetchActiveMatch();
+        }
+      })
       .on('broadcast', { event: 'reloj' }, (payload) => {
         setReloj(payload.payload.reloj);
       })
@@ -133,14 +147,12 @@ export const OverlayMarcador: React.FC = () => {
         </div>
 
         <div style={{
-          background: equipoL.color_secundario 
-            ? `linear-gradient(135deg, ${equipoL.color}, ${equipoL.color_secundario})`
-            : equipoL.color ?? '#222',
+          background: equipoL.color || '#222',
           padding: '0 25px', display: 'flex', alignItems: 'center',
-          minWidth: '180px', justifyContent: 'flex-end', textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+          minWidth: '180px', justifyContent: 'center', textShadow: '0 1px 3px rgba(0,0,0,0.8)',
           boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
           color: equipoL.color_texto ?? 'white',
-          borderBottom: `6px solid ${equipoL.color || 'transparent'}`
+          borderBottom: `6px solid ${equipoL.color_secundario || 'transparent'}`
         }}>
           <span style={{ fontSize: '26px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
             {equipoL.nombre}
@@ -168,14 +180,12 @@ export const OverlayMarcador: React.FC = () => {
         </div>
 
         <div style={{
-          background: equipoV.color_secundario 
-            ? `linear-gradient(135deg, ${equipoV.color}, ${equipoV.color_secundario})`
-            : equipoV.color ?? '#222',
+          background: equipoV.color || '#222',
           padding: '0 25px', display: 'flex', alignItems: 'center',
-          minWidth: '180px', justifyContent: 'flex-start', textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+          minWidth: '180px', justifyContent: 'center', textShadow: '0 1px 3px rgba(0,0,0,0.8)',
           boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
           color: equipoV.color_texto ?? 'white',
-          borderBottom: `6px solid ${equipoV.color || 'transparent'}`
+          borderBottom: `6px solid ${equipoV.color_secundario || 'transparent'}`
         }}>
           <span style={{ fontSize: '26px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
             {equipoV.nombre}

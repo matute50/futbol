@@ -93,7 +93,7 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
   };
 
   const turnosDisponibles = [...new Set(partidos.filter(p => !p.es_libre).map(p => p.turno_horario).filter(Boolean))].sort() as string[];
-  const partidosFiltrados = partidos.filter(p => !p.es_libre && (!turno || p.turno_horario === turno));
+  const partidosFiltrados = partidos.filter(p => !p.es_libre && p.estado !== 'jugado' && (!turno || p.turno_horario === turno));
 
   const getNombre = (id: string | null) => equipos.find(e => e.id === id)?.nombre ?? id ?? '??';
 
@@ -118,18 +118,7 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
     setColorVisita1(cV1); setColorVisita2(cV2); setTextColorVisita(tV);
     
     try {
-      // "Tocar" el partido en Supabase para que el overlay lo detecte como el más reciente
-      await supabase.from('partidos').update({ updated_at: new Date().toISOString() }).eq('id_partido', p.id_partido);
-
-      await precargarPartido({
-        nombreLocal: getNombre(p.id_local).toUpperCase(),
-        nombreVisita: getNombre(p.id_visitante).toUpperCase(),
-        zona: `ZONA ${p.zona}`,
-        colorLocal: cL1, colorLocal2: cL2, colorTextoLocal: tL,
-        colorVisita: cV1, colorVisita2: cV2, colorTextoVisita: tV,
-      });
-
-      // Sincronizar overlay web inmediatamente
+      // Sincronizar overlay web inmediatamente (sin esperar a DB o vMix)
       supabase.channel('broadcast-scoreboard').send({
         type: 'broadcast',
         event: 'reloj',
@@ -139,6 +128,22 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
         type: 'broadcast',
         event: 'periodo',
         payload: { periodo: '—' } // '—' es el estado 'pre'
+      });
+      supabase.channel('broadcast-scoreboard').send({
+        type: 'broadcast',
+        event: 'cambio-partido',
+        payload: { id_partido: p.id_partido, zona: p.zona }
+      });
+
+      // "Tocar" el partido en Supabase para que el overlay lo detecte como el más reciente
+      await supabase.from('partidos').update({ updated_at: new Date().toISOString() }).eq('id_partido', p.id_partido);
+
+      await precargarPartido({
+        nombreLocal: getNombre(p.id_local).toUpperCase(),
+        nombreVisita: getNombre(p.id_visitante).toUpperCase(),
+        zona: `ZONA ${p.zona}`,
+        colorLocal: cL1, colorLocal2: cL2, colorTextoLocal: tL,
+        colorVisita: cV1, colorVisita2: cV2, colorTextoVisita: tV,
       });
 
       showStatus('ok', 'Partido listo');
@@ -166,7 +171,7 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
     supabase.channel('broadcast-scoreboard').send({
       type: 'broadcast',
       event: 'goles',
-      payload: { goles_local: nL, goles_visitante: nV }
+      payload: { id_partido: partidoSel.id_partido, goles_local: nL, goles_visitante: nV }
     });
 
     // Sincronización con vMix y Supabase
@@ -191,21 +196,26 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
     const siguiente = ESTADO_ORDEN[idx + 1] as EstadoPartido;
 
     try {
-      await ejecutarCiclo(VMIX_CICLO_MAP[estadoJuego]);
+      // 1. Actualización inmediata de UI y Broadcasts
       setEstadoJuego(siguiente);
       
-      // Broadcast del periodo
       supabase.channel('broadcast-scoreboard').send({
         type: 'broadcast',
         event: 'periodo',
         payload: { periodo: PERIODO_DISPLAY[siguiente] }
       });
 
-      // Control de reloj automático
+      if (siguiente === 'primer_tiempo') {
+        supabase.channel('broadcast-scoreboard').send({
+          type: 'broadcast',
+          event: 'cambio-partido',
+          payload: { id_partido: partidoSel.id_partido, zona: partidoSel.zona }
+        });
+      }
+
       if (siguiente === 'primer_tiempo' || siguiente === 'entretiempo' || siguiente === 'segundo_tiempo') {
         setSegundos(0);
         setIsTimerRunning(true);
-        // Sincronización inmediata de reloj a cero
         supabase.channel('broadcast-scoreboard').send({
           type: 'broadcast',
           event: 'reloj',
@@ -214,6 +224,9 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
       } else {
         setIsTimerRunning(false);
       }
+
+      // 2. Comunicación con vMix (puede tardar unos milisegundos)
+      await ejecutarCiclo(VMIX_CICLO_MAP[estadoJuego]);
 
       if (siguiente === 'finalizado') {
         await supabase.from('partidos').update({ goles_local: golesLocal, goles_visitante: golesVisita, estado: 'jugado' }).eq('id_partido', partidoSel.id_partido);
@@ -307,7 +320,13 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
                   border: `1px solid ${sel ? 'var(--gold)' : 'var(--dark-border)'}`,
                   padding: '12px', borderRadius: '12px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s'
                 }}>
-                  <div style={{ fontSize: '12px', fontWeight: 800, color: sel ? 'var(--gold)' : 'white', fontFamily: 'Oswald' }}>
+                  <div style={{ 
+                    fontSize: '17px', 
+                    fontWeight: 800, 
+                    color: sel ? 'var(--gold)' : 'white', 
+                    fontFamily: 'Oswald', 
+                    letterSpacing: '1px' 
+                  }}>
                     {getNombre(p.id_local).toUpperCase()} vs {getNombre(p.id_visitante).toUpperCase()}
                   </div>
                   <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '4px' }}>
@@ -443,6 +462,7 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
             <a href="tabla_a.html" target="_blank" className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-300 border border-blue-600/30 rounded text-xs font-bold transition-all uppercase">Tabla A</a>
             <a href="tabla_b.html" target="_blank" className="px-3 py-1.5 bg-green-600/10 hover:bg-green-600/20 text-green-300 border border-green-600/30 rounded text-xs font-bold transition-all uppercase">Tabla B</a>
             <a href="tabla_c.html" target="_blank" className="px-3 py-1.5 bg-orange-600/10 hover:bg-orange-600/20 text-orange-300 border border-orange-600/30 rounded text-xs font-bold transition-all uppercase">Tabla C</a>
+            <a href="tabla_en_vivo.html" target="_blank" className="px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-xs font-bold transition-all uppercase">Tabla en Vivo</a>
           </div>
         </div>
       </div>
@@ -485,20 +505,28 @@ const GoalControl = ({ name, goles, c1, c2, textColor, onMas, onMenos, disabled 
 const ColorTool = ({ label, v1, v2, vt, onChange }: any) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
     <label style={labelStyle}>{label}</label>
-    <div className="flex gap-2 items-center">
-      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: `linear-gradient(135deg, ${v1}, ${v2})`, border: '2px solid var(--dark-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 900, color: vt || 'white' }}>AB</div>
-      <input type="color" title="Color primario" value={v1} onChange={e => onChange(e.target.value, v2, vt)} style={{ width: '28px', height: '28px', padding: 0, border: 'none', cursor: 'pointer', background:'transparent' }} />
-      <input type="color" title="Color secundario" value={v2} onChange={e => onChange(v1, e.target.value, vt)} style={{ width: '28px', height: '28px', padding: 0, border: 'none', cursor: 'pointer', background:'transparent' }} />
+    <div className="flex gap-3 items-end">
+      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: v1, border: `1px solid ${v2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 900, color: vt || 'white', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.3)' }}>AB</div>
+      
+      <div className="flex flex-col items-center gap-1">
+        <span style={{ fontSize: '10px', fontWeight: 900, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Fondo</span>
+        <input type="color" title="Color de Fondo" value={v1} onChange={e => onChange(e.target.value, v2, vt)} style={{ width: '28px', height: '28px', padding: 0, border: 'none', cursor: 'pointer', background:'transparent' }} />
+      </div>
+
+      <div className="flex flex-col items-center gap-1">
+        <span style={{ fontSize: '10px', fontWeight: 900, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Borde</span>
+        <input type="color" title="Color de Borde" value={v2} onChange={e => onChange(v1, e.target.value, vt)} style={{ width: '28px', height: '28px', padding: 0, border: 'none', cursor: 'pointer', background:'transparent' }} />
+      </div>
       
       <div style={{ marginLeft: 'auto', display: 'flex', background: '#111', borderRadius: '6px', padding: '2px', border: '1px solid #333' }}>
         <button 
           onClick={() => onChange(v1, v2, 'white')}
           style={{ width: '24px', height: '24px', borderRadius: '4px', background: vt === 'white' ? '#fff' : 'transparent', color: vt === 'white' ? '#000' : '#fff', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 900 }}
-        >W</button>
+        >B</button>
         <button 
           onClick={() => onChange(v1, v2, 'black')}
           style={{ width: '24px', height: '24px', borderRadius: '4px', background: vt === 'black' ? '#fff' : 'transparent', color: vt === 'black' ? '#000' : '#fff', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 900 }}
-        >B</button>
+        >N</button>
       </div>
     </div>
   </div>

@@ -8,6 +8,7 @@ import { TabConsola } from './components/TabConsola';
 import { OverlayMarcador } from './components/OverlayMarcador';
 import { OverlayFixture } from './components/OverlayFixture';
 import { OverlayStandings } from './components/OverlayStandings';
+import { OverlayLiveStandings } from './components/OverlayLiveStandings';
 import { OverlayTicker } from './components/OverlayTicker';
 import { 
   cargarEquiposDB, 
@@ -177,7 +178,8 @@ export default function App() {
         {viewParam === 'fixture' && <OverlayFixture />}
         {viewParam === 'tablas' && <OverlayStandings />}
         {viewParam === 'ticker' && <OverlayTicker />}
-        {!['marcador', 'fixture', 'tablas', 'ticker'].includes(viewParam || '') && <OverlayMarcador />}
+        {viewParam === 'tabla_en_vivo' && <OverlayLiveStandings />}
+        {!['marcador', 'fixture', 'tablas', 'ticker', 'tabla_en_vivo'].includes(viewParam || '') && <OverlayMarcador />}
       </>
     );
   }

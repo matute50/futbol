@@ -15,6 +15,7 @@ const ZONA_STYLES: Record<Zona, string> = {
 
 export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
   const [fechaActiva, setFechaActiva] = useState<number>(1);
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
 
   const getEquipoById = (id: string | null) => id ? equipos.find(e => e.id === id) : null;
   const fixtureGenerado = partidos.length > 0;
@@ -22,6 +23,23 @@ export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
   const listaFechas = useMemo(() => 
     Array.from(new Set(partidos.map(p => p.fecha_numero))).sort((a,b) => a-b)
   , [partidos]);
+
+  // Auto-seleccionar fecha activa
+  useEffect(() => {
+    if (fixtureGenerado && !hasAutoSelected) {
+      let found = listaFechas[0] || 1;
+      for (const f of listaFechas) {
+        const matches = partidos.filter(p => p.fecha_numero === f && !p.es_libre && p.id_local && p.id_visitante);
+        if (matches.length > 0) {
+          found = f;
+          const pending = matches.some(m => m.estado === 'pendiente');
+          if (pending) break;
+        }
+      }
+      setFechaActiva(found);
+      setHasAutoSelected(true);
+    }
+  }, [fixtureGenerado, listaFechas, partidos, hasAutoSelected]);
   
   const partidosHoy = useMemo(() => 
     partidos

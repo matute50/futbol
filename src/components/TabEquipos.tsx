@@ -78,21 +78,26 @@ export const TabEquipos: React.FC<Props> = ({ equipos, onAgregarEquipo, onEditar
                 ))}
               </select>
             </div>
-            <div className="flex items-center gap-4 px-4 py-2 glass-card shadow-lg" style={{ border: '1px solid var(--dark-border)', borderRadius: '12px' }}>
-              <div className="flex flex-col items-center">
-                <span className="text-[9px] text-gray-400 font-bold uppercase mb-1 tracking-widest">Colores</span>
-                <div className="flex gap-2">
+            <div className="flex items-center gap-6 px-4 py-2 glass-card shadow-lg" style={{ border: '1px solid var(--dark-border)', borderRadius: '12px' }}>
+              <div className="flex gap-6">
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] text-blue-300 font-black uppercase mb-1 tracking-widest">Fondo</span>
                   <input
                     type="color"
                     value={colorInput1}
                     onChange={e => setColorInput1(e.target.value)}
                     style={{ width: '32px', height: '32px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                    title="Color de Fondo"
                   />
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] text-orange-300 font-black uppercase mb-1 tracking-widest">Borde</span>
                   <input
                     type="color"
                     value={colorInput2}
                     onChange={e => setColorInput2(e.target.value)}
                     style={{ width: '32px', height: '32px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                    title="Color de Borde"
                   />
                 </div>
               </div>
@@ -169,20 +174,28 @@ export const TabEquipos: React.FC<Props> = ({ equipos, onAgregarEquipo, onEditar
                       />
                       
                       {/* EDICIÓN DE COLORES EN FILA */}
-                      <div className="flex items-center gap-1.5 opacity-40 hover:opacity-100 transition-opacity">
-                         <input 
-                           type="color" value={eq.color || '#1a4a2e'} 
-                           onChange={e => onEditarEquipo(eq.id, { color: e.target.value })}
-                           style={{ width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
-                         />
-                         <input 
-                           type="color" value={eq.color_secundario || eq.color || '#1a4a2e'} 
-                           onChange={e => onEditarEquipo(eq.id, { color_secundario: e.target.value })}
-                           style={{ width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
-                         />
+                      <div className="flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                         <div className="flex flex-col items-center">
+                           <span className="text-[9px] font-black text-gray-300">F</span>
+                           <input 
+                             type="color" value={eq.color || '#1a4a2e'} 
+                             onChange={e => onEditarEquipo(eq.id, { color: e.target.value })}
+                             style={{ width: '18px', height: '18px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                             title="Color de Fondo"
+                           />
+                         </div>
+                         <div className="flex flex-col items-center">
+                           <span className="text-[9px] font-black text-gray-300">B</span>
+                           <input 
+                             type="color" value={eq.color_secundario || eq.color || '#1a4a2e'} 
+                             onChange={e => onEditarEquipo(eq.id, { color_secundario: e.target.value })}
+                             style={{ width: '18px', height: '18px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                             title="Color de Borde"
+                           />
+                         </div>
                          <div className="flex bg-black/40 rounded p-0.5 border border-white/10 ml-1">
-                            <button onClick={() => onEditarEquipo(eq.id, { color_texto: 'white' })} style={{ width: '16px', height: '16px', fontSize: '8px', color: eq.color_texto === 'white' ? '#fff' : '#666', background: eq.color_texto === 'white' ? '#444' : 'transparent', border: 'none', cursor: 'pointer', fontWeight: 900 }}>W</button>
-                            <button onClick={() => onEditarEquipo(eq.id, { color_texto: 'black' })} style={{ width: '16px', height: '16px', fontSize: '8px', color: eq.color_texto === 'black' ? '#fff' : '#666', background: eq.color_texto === 'black' ? '#444' : 'transparent', border: 'none', cursor: 'pointer', fontWeight: 900 }}>B</button>
+                            <button onClick={() => onEditarEquipo(eq.id, { color_texto: 'white' })} style={{ width: '16px', height: '16px', fontSize: '8px', color: eq.color_texto === 'white' ? '#fff' : '#666', background: eq.color_texto === 'white' ? '#444' : 'transparent', border: 'none', cursor: 'pointer', fontWeight: 900 }}>B</button>
+                            <button onClick={() => onEditarEquipo(eq.id, { color_texto: 'black' })} style={{ width: '16px', height: '16px', fontSize: '8px', color: eq.color_texto === 'black' ? '#fff' : '#666', background: eq.color_texto === 'black' ? '#444' : 'transparent', border: 'none', cursor: 'pointer', fontWeight: 900 }}>N</button>
                          </div>
                       </div>
                     </div>

@@ -27,11 +27,20 @@ export const OverlayFixture: React.FC = () => {
 
     if (loading) return null;
 
-    // Agrupar por fecha
-    const fechas = Array.from(new Set(partidos.map(p => p.fecha_numero))).sort((a,b) => a-b);
-    
-    // Por ahora mostramos la Fecha 1 o la más reciente
-    const fechaActual = 1; 
+    // Determinar la fecha actual a mostrar:
+    // La primera fecha que tenga al menos un partido pendiente.
+    // Si todos los partidos de todas las fechas están jugados, se muestra la última fecha.
+    const fechasDisponibles = Array.from(new Set(partidos.map(p => p.fecha_numero))).sort((a, b) => a - b);
+    let fechaActual = fechasDisponibles[0] || 1;
+
+    for (const f of fechasDisponibles) {
+        const partidosDeLaFecha = partidos.filter(p => p.fecha_numero === f && !p.es_libre && p.id_local && p.id_visitante);
+        if (partidosDeLaFecha.length > 0) {
+            const algunPendiente = partidosDeLaFecha.some(p => p.estado === 'pendiente');
+            fechaActual = f;
+            if (algunPendiente) break;
+        }
+    }
     const hOrder = ['09.00', '10.30', '12.00', '13.30', '15.00', '16.30'];
     const partidosFecha = partidos
         .filter(p => p.fecha_numero === fechaActual && !p.es_libre && p.id_local && p.id_visitante)
@@ -86,7 +95,7 @@ export const OverlayFixture: React.FC = () => {
                                 <div style={{ textAlign: 'right', fontSize: '25px', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
                                     {el?.nombre}
                                 </div>
-                                <div style={{ textAlign: 'center', fontSize: '28px', fontWeight: 900, color: p.estado === 'jugado' ? '#f5a623' : 'rgba(255,255,255,0.4)' }}>
+                                <div style={{ textAlign: 'center', fontSize: p.estado === 'jugado' ? '28px' : '14px', fontWeight: 900, color: '#f5a623' }}>
                                     {p.estado === 'jugado' ? `${p.goles_local}-${p.goles_visitante}` : 'VS'}
                                 </div>
                                 <div style={{ textAlign: 'left', fontSize: '25px', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
