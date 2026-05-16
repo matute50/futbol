@@ -10,6 +10,8 @@ import { OverlayFixture } from './components/OverlayFixture';
 import { OverlayStandings } from './components/OverlayStandings';
 import { OverlayLiveStandings } from './components/OverlayLiveStandings';
 import { OverlayTicker } from './components/OverlayTicker';
+import { OverlayMarcadores } from './components/OverlayMarcadores';
+import { OverlayExportTablas } from './components/OverlayExportTablas';
 import { 
   cargarEquiposDB, 
   cargarPartidosDB, 
@@ -172,15 +174,21 @@ export default function App() {
 
   if (isOverlay) {
     return (
-      <>
-        <style>{`body { background: transparent !important; overflow: hidden; }`}</style>
+      <div style={{ width: '1280px', height: '720px', position: 'relative', overflow: 'hidden', margin: '0 auto' }}>
+        <style>{`
+          body { background: transparent !important; overflow: hidden; margin: 0; padding: 0; }
+          html { background: transparent !important; }
+          * { text-shadow: 2px 2px 4px rgba(0,0,0,1); }
+        `}</style>
         {viewParam === 'marcador' && <OverlayMarcador />}
         {viewParam === 'fixture' && <OverlayFixture />}
         {viewParam === 'tablas' && <OverlayStandings />}
         {viewParam === 'ticker' && <OverlayTicker />}
         {viewParam === 'tabla_en_vivo' && <OverlayLiveStandings />}
-        {!['marcador', 'fixture', 'tablas', 'ticker', 'tabla_en_vivo'].includes(viewParam || '') && <OverlayMarcador />}
-      </>
+        {viewParam === 'marcadores' && <OverlayMarcadores />}
+        {viewParam === 'exportar_tablas' && <OverlayExportTablas />}
+        {!['marcador', 'fixture', 'tablas', 'ticker', 'tabla_en_vivo', 'marcadores', 'exportar_tablas'].includes(viewParam || '') && <OverlayMarcador />}
+      </div>
     );
   }
 

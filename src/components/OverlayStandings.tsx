@@ -137,7 +137,7 @@ export const OverlayStandings: React.FC = () => {
                         animation: live-pulse 1.5s infinite;
                         margin-left: 10px;
                         vertical-align: middle;
-                        text-shadow: none;
+                        text-shadow: 2px 2px 4px rgba(0,0,0,1);
                     }
                     .row-live {
                         background: rgba(239, 68, 68, 0.05);
@@ -163,7 +163,7 @@ export const OverlayStandings: React.FC = () => {
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '20px' }}>
                                                 {isLive && <span className="live-badge">LIVE</span>}
                                                 <span style={{ opacity: 0.4 }}>{idx + 1}</span>
-                                                <span style={{ fontWeight: 800, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{r.nombre}</span>
+                                                <span style={{ fontWeight: 400, textTransform: 'uppercase', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif' }}>{r.nombre}</span>
                                             </div>
                                         </td>
                                         <td style={{ textAlign: 'center', padding: '10px', color: '#f5a623', fontWeight: 700 }}>{r.pj}</td>
@@ -186,7 +186,7 @@ export const OverlayStandings: React.FC = () => {
             <div style={{
                 width: '50vw', height: '100vh', 
                 background: 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)',
-                color: 'white', fontFamily: 'Oswald, sans-serif', padding: '70px 40px 40px 40px',
+                color: 'white', fontFamily: 'Inter, sans-serif', padding: '70px 40px 40px 40px',
                 display: 'flex', flexDirection: 'column'
             }}>
                 <header style={{ marginBottom: '30px', borderLeft: '10px solid #f5a623', paddingLeft: '20px' }}>
@@ -205,7 +205,7 @@ export const OverlayStandings: React.FC = () => {
         <div style={{
             width: '100vw', height: '100vh', 
             background: 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,1) 100%)',
-            color: 'white', fontFamily: 'Oswald, sans-serif', padding: '70px 40px 40px 40px',
+            color: 'white', fontFamily: 'Inter, sans-serif', padding: '70px 40px 40px 40px',
             display: 'flex', flexDirection: 'column'
         }}>
             <header style={{ textAlign: 'center', marginBottom: '40px' }}>

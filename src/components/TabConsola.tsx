@@ -57,6 +57,13 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
 
   const [status, setStatus] = useState<{ type: 'idle' | 'ok' | 'error' | 'loading'; msg: string }>({ type: 'idle', msg: '' });
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  const estadoJuegoRef = useRef(estadoJuego);
+  useEffect(() => {
+    estadoJuegoRef.current = estadoJuego;
+  }, [estadoJuego]);
+
+  const [ultimaTecla, setUltimaTecla] = useState('');
 
   useEffect(() => {
     let interval: any;
@@ -303,6 +310,29 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
     return () => window.removeEventListener('reset-match', handleReset);
   }, [partidoSel, resetPartido]);
 
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      // Registrar qué tecla se presionó para depuración visible en pantalla
+      setUltimaTecla(`key: "${e.key}" | code: "${e.code}" | keyCode: ${e.keyCode}`);
+      
+      // Permitimos '*' de teclado normal o el NumpadMultiply
+      if (e.key === '*' || e.code === 'NumpadMultiply' || e.keyCode === 106 || e.key === 'Multiply') {
+        const estado = estadoJuegoRef.current;
+        if (estado !== 'pre' && estado !== 'finalizado' && estado !== 'entretiempo') {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsTimerRunning(prev => !prev);
+        }
+      }
+    };
+
+    // Usamos capture: true para interceptar el evento antes que cualquier otro elemento
+    window.addEventListener('keydown', handleKey, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleKey, { capture: true });
+    };
+  }, []);
+
   return (
     <div className="fade-in">
 
@@ -341,8 +371,8 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
         <div className="glass-card" style={{ padding: '20px' }}>
           <h3 style={sectionTitleStyle}>AJUSTE DE COLORES</h3>
           <div className="space-y-4">
-            <ColorTool label="LOCAL" v1={colorLocal1} v2={colorLocal2} vt={textColorLocal} onChange={(h1, h2, ht) => aplicarColor('local', h1, h2, ht)} />
-            <ColorTool label="VISITA" v1={colorVisita1} v2={colorVisita2} vt={textColorVisita} onChange={(h1, h2, ht) => aplicarColor('visita', h1, h2, ht)} />
+            <ColorTool label="LOCAL" v1={colorLocal1} v2={colorLocal2} vt={textColorLocal} onChange={(h1: string, h2: string, ht: string) => aplicarColor('local', h1, h2, ht)} />
+            <ColorTool label="VISITA" v1={colorVisita1} v2={colorVisita2} vt={textColorVisita} onChange={(h1: string, h2: string, ht: string) => aplicarColor('visita', h1, h2, ht)} />
           </div>
         </div>
       </div>
@@ -464,6 +494,22 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
             <a href="tabla_c.html" target="_blank" className="px-3 py-1.5 bg-orange-600/10 hover:bg-orange-600/20 text-orange-300 border border-orange-600/30 rounded text-xs font-bold transition-all uppercase">Tabla C</a>
             <a href="tabla_en_vivo.html" target="_blank" className="px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-xs font-bold transition-all uppercase">Tabla en Vivo</a>
           </div>
+        </div>
+
+        {/* SECCIÓN DESCARGAS POST-PRODUCCIÓN */}
+        <div style={{ background: 'rgba(59,130,246,0.05)', padding: '15px 24px', borderRadius: '12px', border: '1px solid rgba(59,130,246,0.2)', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{ background: '#3b82f6', color: 'white', padding: '4px 10px', borderRadius: '4px', fontSize: '10px', fontWeight: 900, fontFamily: 'Oswald' }}>DESCARGAS PNG</div>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Para post-producción:</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a href="marcadores.html" target="_blank" className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs font-bold transition-all uppercase">Descargar Marcadores</a>
+            <a href="exportar_tablas.html" target="_blank" className="px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs font-bold transition-all uppercase">Descargar Tablas</a>
+          </div>
+        </div>
+        
+        <div style={{ position: 'fixed', bottom: '10px', right: '10px', fontSize: '10px', color: 'rgba(255,255,255,0.3)', pointerEvents: 'none', background: 'rgba(0,0,0,0.8)', padding: '4px 8px', borderRadius: '4px', zIndex: 9999 }}>
+          Última tecla: {ultimaTecla || 'Ninguna'}
         </div>
       </div>
     </div>

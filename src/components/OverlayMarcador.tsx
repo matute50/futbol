@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import type { Equipo, Partido } from '../types';
+import { calcularProyeccionGeneral } from '../lib/tablaGeneral';
 
 export const OverlayMarcador: React.FC = () => {
   const [partido, setPartido] = useState<Partido | null>(null);
@@ -11,6 +12,12 @@ export const OverlayMarcador: React.FC = () => {
 
   const [animL, setAnimL] = useState(false);
   const [animV, setAnimV] = useState(false);
+
+
+  
+  // Refs para cálculos
+  const equiposRef = React.useRef<Equipo[]>([]);
+  const partidosRef = React.useRef<Partido[]>([]);
 
   const fetchActiveMatch = async (specificId?: string) => {
     let query = supabase
@@ -28,9 +35,17 @@ export const OverlayMarcador: React.FC = () => {
 
     const { data: pts, error } = await query.limit(1);
 
-    if (error || !pts || pts.length === 0) return;
+    if (error) {
+      console.error("Error fetching match:", error);
+      return;
+    }
+
+    if (!pts || pts.length === 0) {
+      console.warn("No active match found");
+      return;
+    }
     
-    const p = pts[0] as any;
+    const p = pts[0];
     const partidoData: Partido = {
       id_partido: p.id_partido,
       zona: p.zona,
@@ -48,11 +63,17 @@ export const OverlayMarcador: React.FC = () => {
     
     setPartido(partidoData);
     
-    const { data: eqs } = await supabase.from('equipos').select('*').in('id', [p.id_local, p.id_visitante]);
+    const { data: eqs, error: errEqs } = await supabase.from('equipos').select('*');
+    if (errEqs) console.error("Error fetching teams:", errEqs);
+
     if (eqs) {
+      equiposRef.current = eqs as Equipo[];
       setEquipoL(eqs.find(e => e.id === p.id_local) as Equipo);
       setEquipoV(eqs.find(e => e.id === p.id_visitante) as Equipo);
     }
+
+    const { data: allPts } = await supabase.from('partidos').select('*');
+    if (allPts) partidosRef.current = allPts as Partido[];
   };
 
   useEffect(() => {
@@ -84,20 +105,39 @@ export const OverlayMarcador: React.FC = () => {
         setPeriodo(payload.payload.periodo);
       })
       .on('broadcast', { event: 'goles' }, (payload) => {
+        const { id_partido, goles_local, goles_visitante } = payload.payload;
+
         setPartido(prev => {
           if (!prev) return null;
-          if (payload.payload.goles_local > prev.goles_local) {
+          
+          let idGoleador = '';
+          let idRecibio = '';
+
+          if ((goles_local ?? 0) > (prev.goles_local ?? 0)) {
             setAnimL(true);
             setTimeout(() => setAnimL(false), 1500);
+            idGoleador = prev.id_local || '';
+            idRecibio = prev.id_visitante || '';
           }
-          if (payload.payload.goles_visitante > prev.goles_visitante) {
+          if ((goles_visitante ?? 0) > (prev.goles_visitante ?? 0)) {
             setAnimV(true);
             setTimeout(() => setAnimV(false), 1500);
+            idGoleador = prev.id_visitante || '';
+            idRecibio = prev.id_local || '';
           }
+
+          // Actualizar datos para seguimiento de goles
+          if (idGoleador && idRecibio) {
+            const ptsAfter = partidosRef.current.map(p => 
+              p.id_partido === id_partido ? { ...p, goles_local, goles_visitante } : p
+            );
+            partidosRef.current = ptsAfter;
+          }
+
           return { 
             ...prev, 
-            goles_local: payload.payload.goles_local, 
-            goles_visitante: payload.payload.goles_visitante 
+            goles_local, 
+            goles_visitante 
           };
         });
       })
@@ -107,7 +147,15 @@ export const OverlayMarcador: React.FC = () => {
   }, []);
 
   if (!partido || !equipoL || !equipoV) {
-    return <div style={{ color: 'white', padding: '20px', background: 'rgba(0,0,0,0.5)', borderRadius: '8px' }}>CARGANDO MARCADOR...</div>;
+    return (
+      <div style={{ 
+        width: '100vw', height: '100vh', background: 'black', color: 'white', 
+        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+        fontFamily: 'Inter, sans-serif', fontSize: '24px', letterSpacing: '2px'
+      }}>
+        CARGANDO MARCADOR...
+      </div>
+    );
   }
 
   return (
@@ -115,7 +163,7 @@ export const OverlayMarcador: React.FC = () => {
       width: '100vw', height: '100vh', 
       background: 'transparent',
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-      paddingTop: '40px', fontFamily: 'Oswald, sans-serif'
+      paddingTop: '40px', fontFamily: 'Inter, sans-serif'
     }}>
       <style>{`
         @keyframes splash-gol {
@@ -149,12 +197,12 @@ export const OverlayMarcador: React.FC = () => {
         <div style={{
           background: equipoL.color || '#222',
           padding: '0 25px', display: 'flex', alignItems: 'center',
-          minWidth: '180px', justifyContent: 'center', textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+          minWidth: '180px', justifyContent: 'center', textShadow: '2px 2px 4px rgba(0,0,0,1)',
           boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
           color: equipoL.color_texto ?? 'white',
           borderBottom: `6px solid ${equipoL.color_secundario || 'transparent'}`
         }}>
-          <span style={{ fontSize: '26px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <span style={{ fontSize: '26px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'Impact, sans-serif' }}>
             {equipoL.nombre}
           </span>
         </div>
@@ -182,12 +230,12 @@ export const OverlayMarcador: React.FC = () => {
         <div style={{
           background: equipoV.color || '#222',
           padding: '0 25px', display: 'flex', alignItems: 'center',
-          minWidth: '180px', justifyContent: 'center', textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+          minWidth: '180px', justifyContent: 'center', textShadow: '2px 2px 4px rgba(0,0,0,1)',
           boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
           color: equipoV.color_texto ?? 'white',
           borderBottom: `6px solid ${equipoV.color_secundario || 'transparent'}`
         }}>
-          <span style={{ fontSize: '26px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <span style={{ fontSize: '26px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'Impact, sans-serif' }}>
             {equipoV.nombre}
           </span>
         </div>
@@ -201,6 +249,8 @@ export const OverlayMarcador: React.FC = () => {
           <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{periodo}</div>
         </div>
       </div>
+
+
     </div>
   );
 };

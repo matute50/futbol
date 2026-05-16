@@ -83,7 +83,7 @@ export const OverlayTicker: React.FC = () => {
       minHeight: '100vh',
       background: 'transparent',
       padding: '40px 20px',
-      fontFamily: 'Oswald, sans-serif',
+      fontFamily: 'Inter, sans-serif',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -133,15 +133,17 @@ export const OverlayTicker: React.FC = () => {
           display: flex; 
           align-items: center;
           width: 220px; 
-          text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+          text-shadow: 2px 2px 4px rgba(0,0,0,1);
           box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
           font-size: 28px;
-          font-weight: 800;
+          font-weight: 400;
           text-transform: uppercase;
           letter-spacing: 1px;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+          font-family: 'Impact', sans-serif;
+          font-weight: 400;
         }
 
         .score-box {

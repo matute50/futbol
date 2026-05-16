@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Equipo, Partido, Zona } from '../types';
 
 interface Props {
@@ -51,21 +51,17 @@ export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
   , [partidos, fechaActiva]);
     
   const libresHoyCalculados = useMemo(() => {
-    return ['A', 'B', 'C'].map(z => {
+    return (['A', 'B', 'C'] as Zona[]).map(z => {
       const eqsZona = equipos.filter(e => e.zona === z);
       if (eqsZona.length < 5) return { zona: z, equipo: null };
-      const idsJugando = new Set<string>();
-      partidosHoy.filter(p => p.zona === z).forEach(p => {
-        if (p.id_local) idsJugando.add(pf => pf.id_local); // Fix: use local id
-      });
-      // Actually simpler:
+      
       const idsHoy = new Set<string>();
       partidosHoy.forEach(ph => {
         if (ph.id_local) idsHoy.add(ph.id_local);
         if (ph.id_visitante) idsHoy.add(ph.id_visitante);
       });
       const eqLibre = eqsZona.find(e => !idsHoy.has(e.id));
-      return { zona: z as Zona, equipo: eqLibre || null };
+      return { zona: z, equipo: eqLibre || null };
     });
   }, [partidosHoy, equipos]);
 

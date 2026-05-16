@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabase';
 import type { Equipo, Partido } from '../types';
+import { calcularProyeccionGeneral } from '../lib/tablaGeneral';
 
 interface FilaTabla {
     id: string;
@@ -17,11 +18,14 @@ interface FilaTabla {
 }
 
 export const OverlayLiveStandings: React.FC = () => {
-    const [equipos, setEquipos] = useState<Equipo[]>([]);
-    const [partidos, setPartidos] = useState<Partido[]>([]);
-    const [visible, setVisible] = useState(false);
     const [currentZona, setCurrentZona] = useState<'A' | 'B' | 'C' | null>(null);
+    const [proyeccion, setProyeccion] = useState<any[]>([]);
+    
+
     const [filas, setFilas] = useState<FilaTabla[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isFecha5Live, setIsFecha5Live] = useState(false);
+    const [scorerId, setScorerId] = useState<string | null>(null);
     
     // Refs para evitar problemas con cierres (closures) y manejar timers
     const partidosRef = useRef<Partido[]>([]);
@@ -32,23 +36,23 @@ export const OverlayLiveStandings: React.FC = () => {
         const { data: eqs } = await supabase.from('equipos').select('*');
         const { data: pts } = await supabase.from('partidos').select('*');
         if (eqs) {
-            setEquipos(eqs);
-            equiposRef.current = eqs;
+            equiposRef.current = eqs as Equipo[];
         }
         if (pts) {
-            const ptsData = pts as any[];
-            setPartidos(ptsData);
+            const ptsData = pts as Partido[];
             partidosRef.current = ptsData;
             
-            // Detectar zona del partido más recientemente actualizado (el activo en consola)
             const latestMatch = [...ptsData].sort((a, b) => 
-                new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()
+                new Date((b as any).updated_at || 0).getTime() - new Date((a as any).updated_at || 0).getTime()
             )[0];
             
             const zonaToUse = latestMatch?.zona || currentZona || 'A';
             setCurrentZona(zonaToUse);
             setFilas(calcularTabla(zonaToUse, ptsData));
+            setProyeccion(calcularProyeccionGeneral(equiposRef.current, ptsData));
+            setIsFecha5Live(ptsData.some(p => p.fecha_numero === 5 && p.goles_local !== null));
         }
+        setLoading(false);
     };
 
     const calcularTabla = (zona: 'A' | 'B' | 'C', partidosData: Partido[]): FilaTabla[] => {
@@ -63,13 +67,11 @@ export const OverlayLiveStandings: React.FC = () => {
         });
 
         partidosData.filter(p => p.zona === zona).forEach(p => {
-            // Solo procesamos partidos que tengan equipos y goles (finalizados o en vivo)
             if (!p.id_local || !p.id_visitante || p.goles_local === null || p.goles_visitante === null) return;
             
             const gl = p.goles_local;
             const gv = p.goles_visitante;
 
-            // Local
             if (tabla[p.id_local]) {
                 const t = tabla[p.id_local];
                 t.pj++;
@@ -80,7 +82,6 @@ export const OverlayLiveStandings: React.FC = () => {
                 else t.pp++;
             }
 
-            // Visitante
             if (tabla[p.id_visitante]) {
                 const t = tabla[p.id_visitante];
                 t.pj++;
@@ -118,49 +119,41 @@ export const OverlayLiveStandings: React.FC = () => {
             .on('broadcast', { event: 'goles' }, ({ payload }) => {
                 const { id_partido, goles_local, goles_visitante } = payload;
                 
-                // Encontrar el partido afectado
                 const match = partidosRef.current.find(p => p.id_partido === id_partido);
                 if (!match) return;
+
+                const prevL = match.goles_local ?? 0;
+                const prevV = match.goles_visitante ?? 0;
+                let idGoleador = '';
+                let idRecibio = '';
+
+                if (goles_local > prevL) {
+                    idGoleador = match.id_local || '';
+                    idRecibio = match.id_visitante || '';
+                } else if (goles_visitante > prevV) {
+                    idGoleador = match.id_visitante || '';
+                    idRecibio = match.id_local || '';
+                }
 
                 const zona = match.zona;
                 setCurrentZona(zona);
                 
-                // 1. Calcular tabla ANTES del gol (usando el estado actual de partidosRef)
-                const filasBefore = calcularTabla(zona, partidosRef.current);
-                
-                // 2. Calcular tabla DESPUÉS del gol
-                const ptsAfter = partidosRef.current.map(p => 
+                const ptsAfter: Partido[] = partidosRef.current.map(p => 
                     p.id_partido === id_partido 
-                    ? { ...p, goles_local, goles_visitante, estado: 'pendiente' } // Lo tratamos como pendiente pero con goles actualizados
+                    ? { ...p, goles_local, goles_visitante, estado: 'pendiente' as const }
                     : p
                 );
-                const filasAfter = calcularTabla(zona, ptsAfter);
 
-                // 3. Preparar la secuencia de visualización
-                setFilas(filasBefore);
-                setVisible(false);
 
-                // Limpiar timers previos si los hubiera
-                timers.current.forEach(clearTimeout);
-                timers.current = [];
 
-                // Aparecer a los 15 segundos
-                timers.current.push(setTimeout(() => {
-                    setVisible(true);
-                }, 15000));
-
-                // Animar cambios a los 17 segundos (2s después de aparecer)
-                timers.current.push(setTimeout(() => {
-                    setFilas(filasAfter);
-                }, 17000));
-
-                // Desaparecer a los 27 segundos (12s después de aparecer)
-                timers.current.push(setTimeout(() => {
-                    setVisible(false);
-                }, 27000));
-
-                // Actualizar el ref de partidos para la próxima vez
+                setProyeccion(calcularProyeccionGeneral(equiposRef.current, ptsAfter));
+                setIsFecha5Live(ptsAfter.some(p => p.fecha_numero === 5 && p.goles_local !== null));
                 partidosRef.current = ptsAfter;
+
+                if (idGoleador) {
+                    setScorerId(idGoleador);
+                    setTimeout(() => setScorerId(null), 5000);
+                }
             })
             .subscribe();
 
@@ -170,77 +163,152 @@ export const OverlayLiveStandings: React.FC = () => {
         };
     }, []);
 
-    if (!currentZona) return null;
+    if (loading) return null;
 
     const zoneColors: Record<string, string> = { 'A': '#3b82f6', 'B': '#22c55e', 'C': '#f97316' };
-    const color = zoneColors[currentZona];
+    const color = currentZona ? zoneColors[currentZona] : '#333';
+
+    const abrev = (nombre: string) => nombre.toUpperCase().replace('PLAZA ESPAÑA', 'P. ESPAÑA');
 
     return (
-        <div style={{
-            position: 'fixed', bottom: '40px', left: '40px',
-            width: '280px',
-            background: 'rgba(10, 15, 20, 0.5)', 
-            backdropFilter: 'blur(10px)',
-            border: `4px solid ${color}`,
-            borderRadius: '12px',
-            color: 'white', fontFamily: 'Oswald, sans-serif',
-            overflow: 'hidden',
-            boxShadow: `0 15px 40px rgba(0,0,0,0.8), 0 0 20px ${color}22`,
-            zIndex: 9999,
-            transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
-            opacity: visible ? 1 : 0,
-            transform: visible ? 'translateY(0)' : 'translateY(40px)',
-            pointerEvents: 'none'
-        }}>
-            {/* Header Compacto con PTS y DG */}
-            <div style={{ 
-                background: `linear-gradient(90deg, ${color}, ${color}cc)`, 
-                padding: '6px 12px', 
-                display: 'flex', 
-                alignItems: 'center',
-                borderBottom: '1px solid rgba(255,255,255,0.1)'
-            }}>
-                <span style={{ flex: 1, fontWeight: 900, fontSize: '13px', letterSpacing: '0.5px', textTransform: 'uppercase', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                    TABLA EN VIVO - ZONA {currentZona}
-                </span>
-                <span style={{ width: '30px', textAlign: 'center', fontSize: '13px', fontWeight: 900, transform: 'translateX(-5px)', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>PJ</span>
-                <span style={{ width: '30px', textAlign: 'center', fontSize: '13px', fontWeight: 900, transform: 'translateX(-5px)', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Pts</span>
-                <span style={{ width: '30px', textAlign: 'center', fontSize: '13px', fontWeight: 900, transform: 'translateX(-5px)', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>DG</span>
-            </div>
-            
-            {/* Table Container con Filas Maximizadas */}
-            <div style={{ padding: '5px 12px', position: 'relative', height: `${filas.length * 36 + 10}px` }}>
-                <div style={{ position: 'relative' }}>
-                    {filas.map((r, idx) => (
-                        <div key={r.id} style={{
-                            position: 'absolute',
-                            top: `${idx * 36}px`,
-                            left: 0, right: 0,
-                            height: '34px',
-                            display: 'flex', alignItems: 'center',
-                            background: 'rgba(255,255,255,0.03)',
-                            borderRadius: '4px',
-                            padding: '0 12px',
-                            transition: 'all 1.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                            borderLeft: `5px solid ${r.color}`,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
-                        }}>
-                            <span style={{ flex: 1, fontWeight: 700, fontSize: '20px', textTransform: 'uppercase', letterSpacing: '0.3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 2px 8px rgba(0,0,0,1), 0 0 2px rgba(0,0,0,1)' }}>{r.nombre}</span>
-                            <span style={{ width: '30px', textAlign: 'center', fontWeight: 700, color: 'rgba(255,255,255,0.6)', fontSize: '18px', transform: 'translateX(3px)', textShadow: '0 2px 8px rgba(0,0,0,1), 0 0 2px rgba(0,0,0,1)' }}>{r.pj}</span>
-                            <span style={{ width: '30px', textAlign: 'center', fontWeight: 900, color: color, fontSize: '22px', transform: 'translateX(3px)', textShadow: '0 2px 8px rgba(0,0,0,1), 0 0 2px rgba(0,0,0,1)' }}>{r.pts}</span>
-                            <span style={{ width: '30px', textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '18px', fontWeight: 700, transform: 'translateX(3px)', textShadow: '0 2px 8px rgba(0,0,0,1), 0 0 2px rgba(0,0,0,1)' }}>{r.dg > 0 ? `+${r.dg}` : r.dg}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-            
+        <>
             <style>{`
-                @keyframes pulse-gold {
-                    0% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.4); }
-                    70% { box-shadow: 0 0 0 15px rgba(245, 166, 35, 0); }
-                    100% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0); }
+                @keyframes scorer-ping-pong {
+                    0%, 100% { transform: scale(1); filter: brightness(1); }
+                    50% { transform: scale(1.2); filter: brightness(2) drop-shadow(0 0 15px #f5a623); color: #f5a623; }
+                }
+                .anim-scorer {
+                    animation: scorer-ping-pong 0.8s ease-in-out infinite;
+                    color: #f5a623 !important;
+                    font-weight: 900 !important;
+                    z-index: 10;
+                    position: relative;
                 }
             `}</style>
-        </div>
+
+            {/* REPORTE HORIZONTAL DE CRUCES DE PLAYOFFS */}
+            <div 
+                style={{
+                position: 'fixed', bottom: '15px', left: '15px', right: '15px',
+                height: '75px',
+                background: 'rgba(5, 10, 15, 0.9)',
+                backdropFilter: 'blur(20px)',
+                border: '2px solid rgba(255, 255, 255, 0.1)',
+                borderLeft: '10px solid #f5a623',
+                borderRadius: '12px',
+                color: 'white', fontFamily: 'Inter, sans-serif',
+                overflow: 'hidden',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.9)',
+                zIndex: 9998,
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 25px',
+                justifyContent: 'space-between'
+            }}>
+                {/* Título e Info General */}
+                <div style={{ minWidth: '130px', paddingRight: '20px', borderRight: '1px solid rgba(245,166,35,0.3)' }}>
+                    <div style={{ fontFamily: 'Impact, sans-serif', fontSize: '18px', color: '#f5a623', textTransform: 'uppercase', lineHeight: 1 }}>CRUCES</div>
+                    <div style={{ fontFamily: 'Impact, sans-serif', fontSize: '18px', color: 'white', textTransform: 'uppercase', lineHeight: 1 }}>PROYECTADOS</div>
+                    <div style={{ fontSize: '9px', fontWeight: 900, color: '#f5a623', letterSpacing: '1px', marginTop: '4px' }}>
+                        HASTA ESTE MOMENTO
+                    </div>
+                </div>
+
+                {/* ZONA SEMIFINAL (PUNTERO) */}
+                <div style={{ 
+                    flex: '0 0 160px', 
+                    textAlign: 'center', 
+                    padding: '0 15px',
+                    borderRight: '1px solid rgba(245,166,35,0.3)',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center'
+                }}>
+                    <div style={{ fontSize: '10px', fontWeight: 900, color: '#f5a623', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                        DIRECTO A SEMIS
+                    </div>
+                    <div style={{ fontSize: '10px', fontWeight: 900, color: '#f5a623', textTransform: 'uppercase', lineHeight: 1.2, marginBottom: '4px' }}>
+                        COPA DE ORO
+                    </div>
+                    <div className={scorerId === proyeccion.find(e => e.posicion === 1)?.id ? 'anim-scorer' : ''} style={{ fontFamily: 'Impact, sans-serif', fontSize: '20px', textTransform: 'uppercase', color: 'white', whiteSpace: 'nowrap' }}>
+                        {abrev(proyeccion.find(e => e.posicion === 1)?.nombre || 'POR DEFINIR')}
+                    </div>
+                </div>
+
+                {/* ZONA CUARTOS ORO */}
+                <div style={{ 
+                    flex: 1, 
+                    display: 'flex', 
+                    justifyContent: 'space-around', 
+                    alignItems: 'center',
+                    padding: '0 20px',
+                    borderRight: '1px solid rgba(245,166,35,0.3)',
+                    height: '100%'
+                }}>
+                    <div style={{ 
+                        fontSize: '9px', fontWeight: 900, color: '#f5a623', 
+                        transform: 'rotate(-90deg)', whiteSpace: 'nowrap', 
+                        width: '75px', height: '30px',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+                        marginLeft: '-35px', lineHeight: 1
+                    }}>
+                        <div style={{ fontSize: '10px' }}>CUARTOS</div>
+                        <div style={{ fontSize: '11px' }}>ORO</div>
+                    </div>
+                    {[2, 3, 4].map(pos => {
+                        const eq = proyeccion.find(e => e.posicion === pos);
+                        if (!eq) return null;
+                        return (
+                            <div key={pos} style={{ textAlign: 'center' }}>
+                                <div style={{ color: '#f5a623', fontSize: '9px', fontWeight: 900, marginBottom: '2px' }}>{pos}° vs {9-pos}°</div>
+                                <div className={scorerId === eq.id ? 'anim-scorer' : ''} style={{ fontFamily: 'Impact, sans-serif', fontSize: '16px', textTransform: 'uppercase', color: 'white' }}>
+                                    {abrev(eq.nombre)}
+                                </div>
+                                <div className={scorerId === proyeccion.find(e => e.posicion === (pos <= 7 ? 9 - pos : 23 - pos))?.id ? 'anim-scorer' : ''} style={{ fontFamily: 'Impact, sans-serif', fontSize: '16px', textTransform: 'uppercase', color: 'white' }}>
+                                    <span style={{ color: '#f5a623', textTransform: 'lowercase', fontSize: '12px' }}>vs</span> {abrev(eq.rivalNombre || '')}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* ZONA CUARTOS PLATA */}
+                <div style={{ 
+                    flex: 1.3, 
+                    display: 'flex', 
+                    justifyContent: 'space-around', 
+                    alignItems: 'center',
+                    paddingLeft: '20px',
+                    height: '100%'
+                }}>
+                    <div style={{ 
+                        fontSize: '9px', fontWeight: 900, color: '#f5a623', 
+                        transform: 'rotate(-90deg)', whiteSpace: 'nowrap', 
+                        width: '75px', height: '30px',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+                        marginLeft: '-35px', lineHeight: 1
+                    }}>
+                        <div style={{ fontSize: '10px' }}>CUARTOS</div>
+                        <div style={{ fontSize: '11px' }}>PLATA</div>
+                    </div>
+                    {[8, 9, 10, 11].map(pos => {
+                        const eq = proyeccion.find(e => e.posicion === pos);
+                        if (!eq) return null;
+                        return (
+                            <div key={pos} style={{ textAlign: 'center' }}>
+                                <div style={{ color: '#f5a623', fontSize: '9px', fontWeight: 900, marginBottom: '2px' }}>{pos}° vs {23-pos}°</div>
+                                <div className={scorerId === eq.id ? 'anim-scorer' : ''} style={{ fontFamily: 'Impact, sans-serif', fontSize: '16px', textTransform: 'uppercase', color: 'white' }}>
+                                    {abrev(eq.nombre)}
+                                </div>
+                                <div className={scorerId === proyeccion.find(e => e.posicion === (pos <= 7 ? 9 - pos : 23 - pos))?.id ? 'anim-scorer' : ''} style={{ fontFamily: 'Impact, sans-serif', fontSize: '16px', textTransform: 'uppercase', color: 'white' }}>
+                                    <span style={{ color: '#f5a623', textTransform: 'lowercase', fontSize: '12px' }}>vs</span> {abrev(eq.rivalNombre || '')}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </>
     );
 };

@@ -52,7 +52,7 @@ export const OverlayFixture: React.FC = () => {
         <div style={{
             width: '50vw', height: '100vh', 
             background: 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)',
-            color: 'white', fontFamily: 'Oswald, sans-serif', padding: '35px 40px',
+            color: 'white', fontFamily: 'Inter, sans-serif', padding: '35px 40px',
             display: 'flex', flexDirection: 'column', alignItems: 'stretch',
             overflow: 'hidden'
         }}>
@@ -65,7 +65,7 @@ export const OverlayFixture: React.FC = () => {
                     borderRadius: '4px', marginTop: '15px', 
                     width: '100%', textAlign: 'left' 
                 }}>
-                    <span style={{ color: 'black', fontSize: '18px', fontWeight: 900, letterSpacing: '1px', textShadow: 'none' }}>
+                    <span style={{ color: 'black', fontSize: '18px', fontWeight: 900, letterSpacing: '1px' }}>
                         TORNEO 2026 - HECTOR "TOTI" ERRO - FECHA {fechaActual}
                     </span>
                 </div>
@@ -92,13 +92,13 @@ export const OverlayFixture: React.FC = () => {
                             
                             {/* ENCUENTRO */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 1fr', alignItems: 'center', gap: '5px' }}>
-                                <div style={{ textAlign: 'right', fontSize: '25px', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                                <div style={{ textAlign: 'right', fontSize: '25px', fontWeight: 400, textTransform: 'uppercase', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif' }}>
                                     {el?.nombre}
                                 </div>
                                 <div style={{ textAlign: 'center', fontSize: p.estado === 'jugado' ? '28px' : '14px', fontWeight: 900, color: '#f5a623' }}>
                                     {p.estado === 'jugado' ? `${p.goles_local}-${p.goles_visitante}` : 'VS'}
                                 </div>
-                                <div style={{ textAlign: 'left', fontSize: '25px', fontWeight: 700, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                                <div style={{ textAlign: 'left', fontSize: '25px', fontWeight: 400, textTransform: 'uppercase', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif' }}>
                                     {ev?.nombre}
                                 </div>
                             </div>
