@@ -1,4 +1,4 @@
-import type { Equipo, Partido, Zona } from '../types';
+import type { Equipo, Partido } from '../types';
 
 export interface EquipoProyectado {
     id: string;
@@ -21,7 +21,7 @@ export interface EquipoProyectado {
 
 /**
  * Calcula la proyección de la Tabla General para los 15 equipos.
- * Criterio de desempate: 1) Puntos, 2) Diferencia de Gol.
+ * Criterio de desempate: 1) Puntos, 2) Diferencia de Gol, 3) Goles a favor.
  */
 export function calcularProyeccionGeneral(equipos: Equipo[], partidos: Partido[]): EquipoProyectado[] {
     const tabla: Record<string, Omit<EquipoProyectado, 'posicion' | 'cruce' | 'categoria' | 'instancia'>> = {};
@@ -87,7 +87,8 @@ export function calcularProyeccionGeneral(equipos: Equipo[], partidos: Partido[]
         }))
         .sort((a, b) => {
             if (b.pts !== a.pts) return b.pts - a.pts;
-            return b.dg - a.dg;
+            if (b.dg !== a.dg) return b.dg - a.dg;
+            return b.gf - a.gf;
         })
         .map((t, index) => ({
             ...t,
@@ -95,7 +96,7 @@ export function calcularProyeccionGeneral(equipos: Equipo[], partidos: Partido[]
         })) as EquipoProyectado[];
 
     // Asignar categorías y cruces
-    equiposOrdenados.forEach((equipo, i) => {
+    equiposOrdenados.forEach((equipo) => {
         const pos = equipo.posicion;
         
         if (pos === 1) {

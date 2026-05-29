@@ -1,5 +1,5 @@
 import type { Equipo, Partido } from '../types';
-import type { EquipoProyectado } from './tablaGeneral';
+
 import { calcularProyeccionGeneral } from './tablaGeneral';
 
 export interface CertezaPosicion {

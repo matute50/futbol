@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { Equipo, Partido } from '../types';
 import { supabase } from '../supabase';
 import {
@@ -9,8 +9,6 @@ import {
   stopCountdown,
   setColorLocal  as vmixSetColorLocal,
   setColorVisita as vmixSetColorVisita,
-  setTextColorLocal,
-  setTextColorVisita,
 } from '../lib/vmix';
 
 interface Props {
@@ -38,7 +36,6 @@ const PERIODO_DISPLAY: Record<EstadoPartido, string> = {
 };
 
 export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinalizado }) => {
-  const [turno,        setTurno]        = useState('');
   const [partidoSel,   setPartidoSel]   = useState<Partido | null>(null);
 
   const [golesLocal,   setGolesLocal]   = useState(0);
@@ -99,8 +96,19 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
     if (type !== 'loading') statusTimer.current = setTimeout(() => setStatus({ type: 'idle', msg: '' }), 3000);
   };
 
-  const turnosDisponibles = [...new Set(partidos.filter(p => !p.es_libre).map(p => p.turno_horario).filter(Boolean))].sort() as string[];
-  const partidosFiltrados = partidos.filter(p => !p.es_libre && p.estado !== 'jugado' && (!turno || p.turno_horario === turno));
+  const partidosFiltrados = useMemo(() => {
+    const parseHorario = (h: string | null) => {
+      if (!h) return 9999;
+      const limpio = h.toLowerCase().replace(/hs/g, '').trim();
+      const partes = limpio.split(/[\.:]/);
+      const horas = parseInt(partes[0], 10);
+      const minutos = partes[1] ? parseInt(partes[1], 10) : 0;
+      return isNaN(horas) ? 9999 : horas * 60 + (isNaN(minutos) ? 0 : minutos);
+    };
+    return [...partidos]
+      .filter(p => !p.es_libre && p.estado !== 'jugado')
+      .sort((a, b) => parseHorario(a.turno_horario) - parseHorario(b.turno_horario));
+  }, [partidos]);
 
   const getNombre = (id: string | null) => equipos.find(e => e.id === id)?.nombre ?? id ?? '??';
 
@@ -505,6 +513,7 @@ export const TabConsola: React.FC<Props> = ({ equipos, partidos, onPartidoFinali
           <div className="flex flex-wrap gap-2">
             <a href="marcadores.html" target="_blank" className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs font-bold transition-all uppercase">Descargar Marcadores</a>
             <a href="exportar_tablas.html" target="_blank" className="px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs font-bold transition-all uppercase">Descargar Tablas</a>
+            <a href="exportar_fixture.html" target="_blank" className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded text-xs font-bold transition-all uppercase">Descargar Fixture</a>
           </div>
         </div>
         
@@ -524,7 +533,7 @@ const GoalControl = ({ name, goles, c1, c2, textColor, onMas, onMenos, disabled 
       padding: '10px 20px', borderRadius: '10px', minWidth: '180px', textAlign: 'center',
       boxShadow: `0 10px 25px ${c1}44`, border: '1px solid rgba(255,255,255,0.1)'
     }}>
-      <span style={{ color: textColor || 'white', fontSize: '20px', fontWeight: 900, fontFamily: 'Oswald', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+      <span style={{ color: textColor || 'white', fontSize: '20px', fontWeight: 900, fontFamily: 'Oswald', textShadow: (textColor === 'black' || textColor === '#000000') ? '0 2px 4px rgba(255,255,255,0.7)' : '0 2px 4px rgba(0,0,0,0.5)' }}>
         {name}
       </span>
     </div>

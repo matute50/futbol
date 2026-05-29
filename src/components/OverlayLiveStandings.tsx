@@ -3,28 +3,14 @@ import { supabase } from '../supabase';
 import type { Equipo, Partido } from '../types';
 import { calcularProyeccionGeneral } from '../lib/tablaGeneral';
 
-interface FilaTabla {
-    id: string;
-    nombre: string;
-    pj: number;
-    pg: number;
-    pe: number;
-    pp: number;
-    gf: number;
-    gc: number;
-    dg: number;
-    pts: number;
-    color: string;
-}
+
 
 export const OverlayLiveStandings: React.FC = () => {
     const [currentZona, setCurrentZona] = useState<'A' | 'B' | 'C' | null>(null);
     const [proyeccion, setProyeccion] = useState<any[]>([]);
     
 
-    const [filas, setFilas] = useState<FilaTabla[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isFecha5Live, setIsFecha5Live] = useState(false);
     const [scorerId, setScorerId] = useState<string | null>(null);
     
     // Refs para evitar problemas con cierres (closures) y manejar timers
@@ -48,55 +34,12 @@ export const OverlayLiveStandings: React.FC = () => {
             
             const zonaToUse = latestMatch?.zona || currentZona || 'A';
             setCurrentZona(zonaToUse);
-            setFilas(calcularTabla(zonaToUse, ptsData));
             setProyeccion(calcularProyeccionGeneral(equiposRef.current, ptsData));
-            setIsFecha5Live(ptsData.some(p => p.fecha_numero === 5 && p.goles_local !== null));
         }
         setLoading(false);
     };
 
-    const calcularTabla = (zona: 'A' | 'B' | 'C', partidosData: Partido[]): FilaTabla[] => {
-        const eqsZona = equiposRef.current.filter(e => e.zona === zona);
-        const tabla: Record<string, FilaTabla> = {};
 
-        eqsZona.forEach(e => {
-            tabla[e.id] = { 
-                id: e.id, nombre: e.nombre, pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, dg: 0, pts: 0,
-                color: e.color || '#333'
-            };
-        });
-
-        partidosData.filter(p => p.zona === zona).forEach(p => {
-            if (!p.id_local || !p.id_visitante || p.goles_local === null || p.goles_visitante === null) return;
-            
-            const gl = p.goles_local;
-            const gv = p.goles_visitante;
-
-            if (tabla[p.id_local]) {
-                const t = tabla[p.id_local];
-                t.pj++;
-                t.gf += gl;
-                t.gc += gv;
-                if (gl > gv) { t.pg++; t.pts += 3; }
-                else if (gl === gv) { t.pe++; t.pts += 1; }
-                else t.pp++;
-            }
-
-            if (tabla[p.id_visitante]) {
-                const t = tabla[p.id_visitante];
-                t.pj++;
-                t.gf += gv;
-                t.gc += gl;
-                if (gv > gl) { t.pg++; t.pts += 3; }
-                else if (gv === gl) { t.pe++; t.pts += 1; }
-                else t.pp++;
-            }
-        });
-
-        return Object.values(tabla)
-            .map(t => ({ ...t, dg: t.gf - t.gc }))
-            .sort((a, b) => b.pts - a.pts || b.dg - a.dg || b.gf - a.gf);
-    };
 
     useEffect(() => {
         fetchData();
@@ -113,7 +56,6 @@ export const OverlayLiveStandings: React.FC = () => {
 
                 if (zonaToUse) {
                     setCurrentZona(zonaToUse);
-                    setFilas(calcularTabla(zonaToUse, partidosRef.current));
                 }
             })
             .on('broadcast', { event: 'goles' }, ({ payload }) => {
@@ -125,14 +67,10 @@ export const OverlayLiveStandings: React.FC = () => {
                 const prevL = match.goles_local ?? 0;
                 const prevV = match.goles_visitante ?? 0;
                 let idGoleador = '';
-                let idRecibio = '';
-
                 if (goles_local > prevL) {
                     idGoleador = match.id_local || '';
-                    idRecibio = match.id_visitante || '';
                 } else if (goles_visitante > prevV) {
                     idGoleador = match.id_visitante || '';
-                    idRecibio = match.id_local || '';
                 }
 
                 const zona = match.zona;
@@ -147,7 +85,6 @@ export const OverlayLiveStandings: React.FC = () => {
 
 
                 setProyeccion(calcularProyeccionGeneral(equiposRef.current, ptsAfter));
-                setIsFecha5Live(ptsAfter.some(p => p.fecha_numero === 5 && p.goles_local !== null));
                 partidosRef.current = ptsAfter;
 
                 if (idGoleador) {
@@ -164,9 +101,6 @@ export const OverlayLiveStandings: React.FC = () => {
     }, []);
 
     if (loading) return null;
-
-    const zoneColors: Record<string, string> = { 'A': '#3b82f6', 'B': '#22c55e', 'C': '#f97316' };
-    const color = currentZona ? zoneColors[currentZona] : '#333';
 
     const abrev = (nombre: string) => nombre.toUpperCase().replace('PLAZA ESPAÑA', 'P. ESPAÑA');
 

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../supabase';
 import type { Equipo, Partido } from '../types';
 import { calcularProyeccionGeneral } from '../lib/tablaGeneral';
-import type { EquipoProyectado } from '../lib/tablaGeneral';
+
 
 /**
  * Hook para obtener la Tabla General proyectada en tiempo real.

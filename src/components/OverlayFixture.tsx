@@ -41,10 +41,18 @@ export const OverlayFixture: React.FC = () => {
             if (algunPendiente) break;
         }
     }
-    const hOrder = ['09.00', '10.30', '12.00', '13.30', '15.00', '16.30'];
-    const partidosFecha = partidos
+    const parseHorario = (h: string | null) => {
+        if (!h) return 9999;
+        const limpio = h.toLowerCase().replace(/hs/g, '').trim();
+        const partes = limpio.split(/[\.:]/);
+        const horas = parseInt(partes[0], 10);
+        const minutos = partes[1] ? parseInt(partes[1], 10) : 0;
+        return isNaN(horas) ? 9999 : horas * 60 + (isNaN(minutos) ? 0 : minutos);
+    };
+
+    const partidosFecha = [...partidos]
         .filter(p => p.fecha_numero === fechaActual && !p.es_libre && p.id_local && p.id_visitante)
-        .sort((a,b) => hOrder.indexOf(a.turno_horario || '') - hOrder.indexOf(b.turno_horario || ''));
+        .sort((a, b) => parseHorario(a.turno_horario) - parseHorario(b.turno_horario));
 
     const getEquipo = (id: string | null) => equipos.find(e => e.id === id);
 
@@ -65,7 +73,7 @@ export const OverlayFixture: React.FC = () => {
                     borderRadius: '4px', marginTop: '15px', 
                     width: '100%', textAlign: 'left' 
                 }}>
-                    <span style={{ color: 'black', fontSize: '18px', fontWeight: 900, letterSpacing: '1px' }}>
+                    <span style={{ color: 'black', fontSize: '18px', fontWeight: 900, letterSpacing: '1px', textShadow: '2px 2px 4px rgba(255,255,255,0.7)' }}>
                         TORNEO 2026 - HECTOR "TOTI" ERRO - FECHA {fechaActual}
                     </span>
                 </div>
@@ -76,29 +84,38 @@ export const OverlayFixture: React.FC = () => {
                     const el = getEquipo(p.id_local);
                     const ev = getEquipo(p.id_visitante);
                     const zoneColors: Record<string, string> = { 'A': '#3b82f6', 'B': '#22c55e', 'C': '#f97316' };
+
+                    const isPlayoff = fechaActual >= 6;
+                    const badgeBg = isPlayoff
+                        ? (p.zona === 'A' ? '#d4af37' : '#a0a0a0')
+                        : (zoneColors[p.zona] || '#374151');
+                    const badgeText = isPlayoff
+                        ? `COPA ${p.zona === 'A' ? 'ORO' : 'PLATA'}`
+                        : `ZONA ${p.zona}`;
+
                     return (
                         <div key={p.id_partido} style={{
-                            display: 'grid', gridTemplateColumns: '55px 1fr 75px',
+                            display: 'grid', gridTemplateColumns: isPlayoff ? '55px 1fr 100px' : '55px 1fr 75px',
                             alignItems: 'center', background: 'rgba(255,255,255,0.15)',
-                            padding: '10px 15px', borderRadius: '6px', 
+                            padding: isPlayoff ? '6px 15px' : '10px 15px', borderRadius: '6px', 
                             borderLeft: '5px solid #f5a623',
                             borderTop: '1px solid rgba(255,255,255,0.1)',
                             borderRight: '1px solid rgba(255,255,255,0.1)',
                             borderBottom: '1px solid rgba(255,255,255,0.1)',
-                            height: '12.5%', gap: '8px'
+                            height: isPlayoff ? '11.5%' : '12.5%', gap: '8px'
                         }}>
                             {/* HORARIO */}
-                            <div style={{ fontWeight: 800, color: '#f5a623', fontSize: '17.25px' }}>{p.turno_horario}</div>
+                            <div style={{ fontWeight: 800, color: '#f5a623', fontSize: isPlayoff ? '15.5px' : '17.25px' }}>{p.turno_horario}</div>
                             
                             {/* ENCUENTRO */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 1fr', alignItems: 'center', gap: '5px' }}>
-                                <div style={{ textAlign: 'right', fontSize: '25px', fontWeight: 400, textTransform: 'uppercase', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif' }}>
+                                <div style={{ textAlign: 'right', fontSize: isPlayoff ? '21px' : '25px', fontWeight: 400, textTransform: 'uppercase', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif' }}>
                                     {el?.nombre}
                                 </div>
-                                <div style={{ textAlign: 'center', fontSize: p.estado === 'jugado' ? '28px' : '14px', fontWeight: 900, color: '#f5a623' }}>
+                                <div style={{ textAlign: 'center', fontSize: p.estado === 'jugado' ? (isPlayoff ? '23px' : '28px') : '14px', fontWeight: 900, color: '#f5a623' }}>
                                     {p.estado === 'jugado' ? `${p.goles_local}-${p.goles_visitante}` : 'VS'}
                                 </div>
-                                <div style={{ textAlign: 'left', fontSize: '25px', fontWeight: 400, textTransform: 'uppercase', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif' }}>
+                                <div style={{ textAlign: 'left', fontSize: isPlayoff ? '21px' : '25px', fontWeight: 400, textTransform: 'uppercase', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif' }}>
                                     {ev?.nombre}
                                 </div>
                             </div>
@@ -106,11 +123,12 @@ export const OverlayFixture: React.FC = () => {
                             {/* ZONA */}
                             <div style={{ textAlign: 'right' }}>
                                 <span style={{ 
-                                    background: zoneColors[p.zona], color: 'white', 
-                                    padding: '3.5px 9.5px', borderRadius: '4px', 
-                                    fontSize: '13.8px', fontWeight: 900, letterSpacing: '0.5px', whiteSpace: 'nowrap'
+                                    background: badgeBg, color: isPlayoff && p.zona === 'A' ? 'black' : 'white', 
+                                    textShadow: isPlayoff && p.zona === 'A' ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)',
+                                    padding: isPlayoff ? '4px 10px' : '3.5px 9.5px', borderRadius: '4px', 
+                                    fontSize: isPlayoff ? '15px' : '13.8px', fontWeight: 900, letterSpacing: '0.5px', whiteSpace: 'nowrap'
                                 }}>
-                                    ZONA {p.zona}
+                                    {badgeText}
                                 </span>
                             </div>
                         </div>

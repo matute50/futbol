@@ -6,8 +6,6 @@ export const OverlayTicker: React.FC = () => {
   const [partidos, setPartidos] = useState<Partido[]>([]);
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reloj, setReloj] = useState('00:00');
-  const [periodo, setPeriodo] = useState('PRIMER TIEMPO');
   
   // Track previous scores for animations
   const prevScores = useRef<Record<string, { l: number, v: number }>>({});
@@ -65,8 +63,6 @@ export const OverlayTicker: React.FC = () => {
       .channel('ticker-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'partidos' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'equipos' }, () => fetchData())
-      .on('broadcast', { event: 'reloj' }, (payload) => setReloj(payload.payload.reloj))
-      .on('broadcast', { event: 'periodo' }, (payload) => setPeriodo(payload.payload.periodo))
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -202,10 +198,13 @@ export const OverlayTicker: React.FC = () => {
 
         return (
           <div key={p.id_partido} className="scoreboard-bar">
-            {/* ZONA */}
-            <div className="zona-box">
-              <span style={{ fontSize: '10.35px', fontWeight: 800, opacity: 0.7 }}>ZONA</span>
-              <span style={{ fontSize: '27.6px', fontWeight: 900, lineHeight: 0.9 }}>{p.zona}</span>
+            {/* ZONA / COPA */}
+            <div className="zona-box" style={{ 
+              background: p.fecha_numero >= 6 ? (p.zona === 'A' ? '#d4af37' : '#a0a0a0') : '#000', 
+              color: p.fecha_numero >= 6 && p.zona === 'A' ? '#000' : (p.fecha_numero >= 6 ? '#fff' : '#f5a623')
+            }}>
+              <span style={{ fontSize: '10.35px', fontWeight: 800, opacity: 0.7, textShadow: p.fecha_numero >= 6 && p.zona === 'A' ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)' }}>{p.fecha_numero >= 6 ? 'COPA' : 'ZONA'}</span>
+              <span style={{ fontSize: p.fecha_numero >= 6 ? '18px' : '27.6px', fontWeight: 900, lineHeight: 0.9, textShadow: p.fecha_numero >= 6 && p.zona === 'A' ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)' }}>{p.fecha_numero >= 6 ? (p.zona === 'A' ? 'ORO' : 'PLATA') : p.zona}</span>
             </div>
 
             {/* EQUIPO L */}
@@ -217,7 +216,9 @@ export const OverlayTicker: React.FC = () => {
               color: eqL.color_texto ?? 'white',
               borderBottom: `4px solid ${eqL.color || 'transparent'}`
             }}>
-              {eqL.nombre}
+              <span style={{textShadow: (eqL.color_texto === 'black' || eqL.color_texto === '#000000') ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)'}}>
+                {eqL.nombre}
+              </span>
             </div>
 
             {/* SCORE L */}
@@ -241,7 +242,9 @@ export const OverlayTicker: React.FC = () => {
               color: eqV.color_texto ?? 'white',
               borderBottom: `4px solid ${eqV.color || 'transparent'}`
             }}>
-              {eqV.nombre}
+              <span style={{textShadow: (eqV.color_texto === 'black' || eqV.color_texto === '#000000') ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)'}}>
+                {eqV.nombre}
+              </span>
             </div>
 
             {/* RELOJ / INFO */}

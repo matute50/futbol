@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ImpactoGol } from '../lib/tablaGeneral';
+import type { ImpactoGol } from '../lib/tablaGeneral';
 
 interface Props {
     impacto: ImpactoGol;

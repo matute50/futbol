@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Equipo, Partido, Zona } from '../types';
+import { calcularProyeccionGeneral } from '../lib/tablaGeneral';
 
 interface Props {
   equipos: Equipo[];
@@ -19,6 +20,11 @@ export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
 
   const getEquipoById = (id: string | null) => id ? equipos.find(e => e.id === id) : null;
   const fixtureGenerado = partidos.length > 0;
+
+  const proyeccion = useMemo(() => calcularProyeccionGeneral(equipos, partidos), [equipos, partidos]);
+  const semifinalista = useMemo(() => {
+    return equipos.find(e => e.id === proyeccion.find(p => p.posicion === 1)?.id);
+  }, [equipos, proyeccion]);
 
   const listaFechas = useMemo(() => 
     Array.from(new Set(partidos.map(p => p.fecha_numero))).sort((a,b) => a-b)
@@ -41,14 +47,20 @@ export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
     }
   }, [fixtureGenerado, listaFechas, partidos, hasAutoSelected]);
   
-  const partidosHoy = useMemo(() => 
-    partidos
+  const partidosHoy = useMemo(() => {
+    const parseHorario = (h: string | null) => {
+      if (!h) return 9999;
+      const limpio = h.toLowerCase().replace(/hs/g, '').trim();
+      const partes = limpio.split(/[\.:]/);
+      const horas = parseInt(partes[0], 10);
+      const minutos = partes[1] ? parseInt(partes[1], 10) : 0;
+      return isNaN(horas) ? 9999 : horas * 60 + (isNaN(minutos) ? 0 : minutos);
+    };
+
+    return [...partidos]
       .filter(p => p.fecha_numero === fechaActiva && !p.es_libre)
-      .sort((a,b) => {
-         const hOrder = ["09.00", "10.30", "12.00", "13.30", "15.00", "16.30"];
-         return hOrder.indexOf(a.turno_horario || "") - hOrder.indexOf(b.turno_horario || "");
-      })
-  , [partidos, fechaActiva]);
+      .sort((a, b) => parseHorario(a.turno_horario) - parseHorario(b.turno_horario));
+  }, [partidos, fechaActiva]);
     
   const libresHoyCalculados = useMemo(() => {
     return (['A', 'B', 'C'] as Zona[]).map(z => {
@@ -104,8 +116,8 @@ export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
                 </h2>
             </div>
 
-            <div className="flex-1 overflow-hidden">
-              <table className="w-full h-full text-left" style={{ tableLayout: 'fixed' }}>
+            <div className="flex-1 overflow-y-auto">
+              <table className="w-full text-left" style={{ tableLayout: 'fixed' }}>
                 <thead>
                   <tr className="bg-white/5">
                     <th className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500 text-center w-[120px]">HORARIO</th>
@@ -119,38 +131,45 @@ export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
                   {partidosHoy.map((p) => {
                     const local = getEquipoById(p.id_local);
                     const visitante = getEquipoById(p.id_visitante);
-                    const badgeClass = ZONA_STYLES[p.zona];
                     const esJugado = p.estado === 'jugado';
+
+                    const isFechaPlayoffs = fechaActiva === 6;
+                    const badgeClass = isFechaPlayoffs
+                      ? (p.zona === 'A' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/30')
+                      : ZONA_STYLES[p.zona] || 'bg-gray-800 text-gray-500';
+                    const labelZona = isFechaPlayoffs
+                      ? `COPA ${p.zona === 'A' ? 'ORO' : 'PLATA'}`
+                      : `ZONA ${p.zona}`;
 
                     return (
                       <tr key={p.id_partido} className="hover:bg-white/2" style={{ borderLeft: '4px solid var(--gold)' }}>
-                        <td className="px-6 py-2 text-center">
-                           <span className="font-black text-gold italic" style={{ fontFamily: 'Oswald', fontSize: '23px' }}>{p.turno_horario}</span>
+                        <td className="px-6 text-center" style={{ paddingTop: isFechaPlayoffs ? '4px' : '8px', paddingBottom: isFechaPlayoffs ? '4px' : '8px' }}>
+                           <span className="font-black text-gold italic" style={{ fontFamily: 'Oswald', fontSize: isFechaPlayoffs ? '18px' : '23px' }}>{p.turno_horario}</span>
                         </td>
-                        <td className="px-6 py-2">
+                        <td className="px-6" style={{ paddingTop: isFechaPlayoffs ? '4px' : '8px', paddingBottom: isFechaPlayoffs ? '4px' : '8px' }}>
                            <div className="flex justify-center">
-                             <div className={`px-3 py-1 rounded-lg font-black tracking-widest uppercase text-center ${badgeClass}`} style={{ minWidth: '92px', fontSize: '11.5px' }}>
-                               ZONA {p.zona}
+                             <div className={`px-3 py-1 rounded-lg font-black tracking-widest uppercase text-center ${badgeClass}`} style={{ minWidth: isFechaPlayoffs ? '82px' : '92px', fontSize: isFechaPlayoffs ? '9.5px' : '11.5px' }}>
+                                {labelZona}
                              </div>
                            </div>
                         </td>
-                        <td className="px-6 py-2 font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald', fontSize: '28px' }}>
+                        <td className="px-6 font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald', fontSize: isFechaPlayoffs ? '20px' : '28px', paddingTop: isFechaPlayoffs ? '4px' : '8px', paddingBottom: isFechaPlayoffs ? '4px' : '8px' }}>
                            <div className="flex items-center gap-3">
                               <div className="w-1.5 h-6 rounded-full" style={{ background: local?.color || '#374151' }} />
                               {local?.nombre.toUpperCase() || '—'}
                            </div>
                         </td>
-                        <td className="px-6 py-2 font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald', fontSize: '28px' }}>
+                        <td className="px-6 font-black uppercase tracking-tighter" style={{ fontFamily: 'Oswald', fontSize: isFechaPlayoffs ? '20px' : '28px', paddingTop: isFechaPlayoffs ? '4px' : '8px', paddingBottom: isFechaPlayoffs ? '4px' : '8px' }}>
                            <div className="flex items-center gap-3">
                               <div className="w-1.5 h-6 rounded-full" style={{ background: visitante?.color || '#374151' }} />
                               {visitante?.nombre.toUpperCase() || '—'}
                            </div>
                         </td>
-                        <td className="px-6 py-2 text-center font-black italic uppercase" style={{ fontFamily: 'Oswald', fontSize: '28px' }}>
+                        <td className="px-6 text-center font-black italic uppercase" style={{ fontFamily: 'Oswald', fontSize: isFechaPlayoffs ? '20px' : '28px', paddingTop: isFechaPlayoffs ? '4px' : '8px', paddingBottom: isFechaPlayoffs ? '4px' : '8px' }}>
                            {esJugado ? (
                                <span className="text-green-400">{p.goles_local} — {p.goles_visitante}</span>
                            ) : (
-                             <span className="text-yellow-500/60" style={{ fontSize: '24px' }}>PENDIENTE</span>
+                             <span className="text-yellow-500/60" style={{ fontSize: isFechaPlayoffs ? '18px' : '24px' }}>PENDIENTE</span>
                            )}
                         </td>
                       </tr>
@@ -162,6 +181,17 @@ export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
 
             {/* Libres Compactos */}
             <div className="px-8 py-3 border-t border-white/5 bg-black/20">
+              {fechaActiva === 6 ? (
+                <div className="flex justify-center items-center gap-6">
+                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest mr-4">PASE DIRECTO A SEMIFINALES - COPA DE ORO:</span>
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-0.5 rounded text-[8px] font-black bg-yellow-500 text-black">#1 GENERAL</span>
+                    <span className="font-black tracking-tight uppercase text-gold" style={{ fontFamily: 'Oswald', fontSize: '20.7px' }}>
+                      {semifinalista ? semifinalista.nombre.toUpperCase() : 'NO DETERMINADO'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
                 <div className="flex justify-center items-center gap-12">
                    <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest mr-4">DESCANSAN:</span>
                     {libresHoyCalculados.map(l => {
@@ -176,6 +206,7 @@ export const TabCronograma: React.FC<Props> = ({ equipos, partidos }) => {
                       );
                     })}
                 </div>
+              )}
             </div>
           </div>
         </>

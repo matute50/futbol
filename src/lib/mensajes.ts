@@ -34,7 +34,7 @@ export function generarMensajeDeImpacto(
     }
 
     // Caso: Cuartos de Final (Puestos 2 al 15)
-    const copaTexto = `Copa de ${categoria}`;
+
     const instanciaTexto = `Cuartos de ${categoria}`;
 
     if (esDefinitivo) {

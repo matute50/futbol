@@ -1,7 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { useTablaGeneral } from '../hooks/useTablaGeneral';
-import type { EquipoProyectado } from '../lib/tablaGeneral';
 
 export const TablaGeneralProyectada: React.FC = () => {
     const { tabla, loading, error } = useTablaGeneral();
@@ -95,7 +93,7 @@ export const TablaGeneralProyectada: React.FC = () => {
             <footer className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white/5 p-4 rounded-lg border border-white/10">
                     <h3 className="text-[#f5a623] font-bold text-xs uppercase mb-2">Criterio de Desempate</h3>
-                    <p className="text-sm opacity-70">1. Puntos acumulados<br/>2. Diferencia de gol (DG)</p>
+                    <p className="text-sm opacity-70">1. Puntos acumulados<br/>2. Diferencia de gol (DG)<br/>3. Goles a favor (GF)</p>
                 </div>
                 <div className="bg-white/5 p-4 rounded-lg border border-white/10">
                     <h3 className="text-yellow-500 font-bold text-xs uppercase mb-2">Copa de Oro</h3>

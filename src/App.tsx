@@ -12,15 +12,16 @@ import { OverlayLiveStandings } from './components/OverlayLiveStandings';
 import { OverlayTicker } from './components/OverlayTicker';
 import { OverlayMarcadores } from './components/OverlayMarcadores';
 import { OverlayExportTablas } from './components/OverlayExportTablas';
+import { OverlayCruces } from './components/OverlayCruces';
+import { OverlayExportFixture } from './components/OverlayExportFixture';
 import { 
   cargarEquiposDB, 
   cargarPartidosDB, 
   insertarEquipoDB, 
   actualizarEquipoDB, 
-  insertarPartidosBatchDB, 
-  actualizarPartidoDB 
+  insertarPartidosBatchDB
 } from './db';
-import { generarCodigoEquipo, HORARIOS_DISPONIBLES } from './fixture';
+import { HORARIOS_DISPONIBLES } from './fixture';
 
 // Extender TabActiva para incluir la consola
 type TabActivaExtended = TabActiva | 'consola';
@@ -39,7 +40,7 @@ export default function App() {
   const [equipos,   setEquipos]   = useState<Equipo[]>([]);
   const [partidos,  setPartidos]  = useState<Partido[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
-  const [syncMsg,   setSyncMsg]    = useState('Cargando datos...');
+  const [, setSyncMsg] = useState('Cargando datos...');
 
   // Detección de vista (overlay o dashboard)
   const viewParam = new URLSearchParams(window.location.search).get('view');
@@ -162,7 +163,6 @@ export default function App() {
   }, []);
 
 
-  const equiposPorZona = (zona: 'A' | 'B' | 'C') => equipos.filter(e => e.zona === zona).length;
   const fixtureGenerado = partidos.length > 0;
 
   const syncColor: Record<SyncStatus, string> = {
@@ -187,7 +187,9 @@ export default function App() {
         {viewParam === 'tabla_en_vivo' && <OverlayLiveStandings />}
         {viewParam === 'marcadores' && <OverlayMarcadores />}
         {viewParam === 'exportar_tablas' && <OverlayExportTablas />}
-        {!['marcador', 'fixture', 'tablas', 'ticker', 'tabla_en_vivo', 'marcadores', 'exportar_tablas'].includes(viewParam || '') && <OverlayMarcador />}
+        {viewParam === 'exportar_fixture' && <OverlayExportFixture />}
+        {viewParam === 'cruces' && <OverlayCruces />}
+        {!['marcador', 'fixture', 'tablas', 'ticker', 'tabla_en_vivo', 'marcadores', 'exportar_tablas', 'exportar_fixture', 'cruces'].includes(viewParam || '') && <OverlayMarcador />}
       </div>
     );
   }

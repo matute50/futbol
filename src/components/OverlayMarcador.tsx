@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import type { Equipo, Partido } from '../types';
-import { calcularProyeccionGeneral } from '../lib/tablaGeneral';
+
 
 export const OverlayMarcador: React.FC = () => {
   const [partido, setPartido] = useState<Partido | null>(null);
@@ -185,24 +185,25 @@ export const OverlayMarcador: React.FC = () => {
         borderRadius: '4px', overflow: 'visible', boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
         border: '1px solid rgba(255,255,255,0.1)', height: '60px'
       }}>
+        {/* ZONA / COPA */}
         <div style={{
-          background: '#000', padding: '0 15px', display: 'flex', flexDirection: 'column', 
+          background: partido.fecha_numero >= 6 ? (partido.zona === 'A' ? '#d4af37' : '#a0a0a0') : '#000', padding: '0 15px', display: 'flex', flexDirection: 'column', 
           alignItems: 'center', justifyContent: 'center', 
-          borderRight: '1px solid rgba(255,255,255,0.1)', color: '#f5a623'
+          borderRight: '1px solid rgba(255,255,255,0.1)', color: partido.fecha_numero >= 6 && partido.zona === 'A' ? '#000' : (partido.fecha_numero >= 6 ? '#fff' : '#f5a623'), minWidth: '80px'
         }}>
-          <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8 }}>ZONA</span>
-          <span style={{ fontSize: '32px', fontWeight: 900, lineHeight: 0.9 }}>{partido.zona}</span>
+          <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8, textShadow: partido.fecha_numero >= 6 && partido.zona === 'A' ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)' }}>{partido.fecha_numero >= 6 ? 'COPA' : 'ZONA'}</span>
+          <span style={{ fontSize: partido.fecha_numero >= 6 ? '20px' : '32px', fontWeight: 900, lineHeight: 0.9, textShadow: partido.fecha_numero >= 6 && partido.zona === 'A' ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)' }}>{partido.fecha_numero >= 6 ? (partido.zona === 'A' ? 'ORO' : 'PLATA') : partido.zona}</span>
         </div>
 
         <div style={{
           background: equipoL.color || '#222',
           padding: '0 25px', display: 'flex', alignItems: 'center',
-          minWidth: '180px', justifyContent: 'center', textShadow: '2px 2px 4px rgba(0,0,0,1)',
+          minWidth: '180px', justifyContent: 'center',
           boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
           color: equipoL.color_texto ?? 'white',
           borderBottom: `6px solid ${equipoL.color_secundario || 'transparent'}`
         }}>
-          <span style={{ fontSize: '26px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'Impact, sans-serif' }}>
+          <span style={{ fontSize: '26px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'Impact, sans-serif', textShadow: (equipoL?.color_texto === 'black' || equipoL?.color_texto === '#000000') ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)' }}>
             {equipoL.nombre}
           </span>
         </div>
@@ -230,12 +231,12 @@ export const OverlayMarcador: React.FC = () => {
         <div style={{
           background: equipoV.color || '#222',
           padding: '0 25px', display: 'flex', alignItems: 'center',
-          minWidth: '180px', justifyContent: 'center', textShadow: '2px 2px 4px rgba(0,0,0,1)',
+          minWidth: '180px', justifyContent: 'center',
           boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
           color: equipoV.color_texto ?? 'white',
           borderBottom: `6px solid ${equipoV.color_secundario || 'transparent'}`
         }}>
-          <span style={{ fontSize: '26px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'Impact, sans-serif' }}>
+          <span style={{ fontSize: '26px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'Impact, sans-serif', textShadow: (equipoV?.color_texto === 'black' || equipoV?.color_texto === '#000000') ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)' }}>
             {equipoV.nombre}
           </span>
         </div>

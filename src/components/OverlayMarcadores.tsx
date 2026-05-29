@@ -46,10 +46,18 @@ export const OverlayMarcadores: React.FC = () => {
         }
     }
 
-    const hOrder = ['09.00', '10.30', '12.00', '13.30', '15.00', '16.30'];
-    const partidosFecha = partidos
+    const parseHorario = (h: string | null) => {
+        if (!h) return 9999;
+        const limpio = h.toLowerCase().replace(/hs/g, '').trim();
+        const partes = limpio.split(/[\.:]/);
+        const horas = parseInt(partes[0], 10);
+        const minutos = partes[1] ? parseInt(partes[1], 10) : 0;
+        return isNaN(horas) ? 9999 : horas * 60 + (isNaN(minutos) ? 0 : minutos);
+    };
+
+    const partidosFecha = [...partidos]
         .filter(p => p.fecha_numero === fechaPasada && !p.es_libre && p.id_local && p.id_visitante)
-        .sort((a,b) => hOrder.indexOf(a.turno_horario || '') - hOrder.indexOf(b.turno_horario || ''));
+        .sort((a, b) => parseHorario(a.turno_horario) - parseHorario(b.turno_horario));
 
     const getEquipo = (id: string | null) => equipos.find(e => e.id === id);
 
@@ -89,7 +97,7 @@ export const OverlayMarcadores: React.FC = () => {
                 <button 
                     onClick={handleDownload}
                     style={{
-                        background: '#f5a623', color: 'black',
+                        background: '#f5a623', color: 'black', textShadow: '2px 2px 4px rgba(255,255,255,0.7)',
                         padding: '8px 16px', borderRadius: '6px',
                         border: 'none', fontSize: '14px', fontWeight: 'bold',
                         cursor: 'pointer', fontFamily: 'Inter', textTransform: 'uppercase',
@@ -117,7 +125,7 @@ export const OverlayMarcadores: React.FC = () => {
                         borderRadius: '4px', marginTop: '6px', 
                         display: 'inline-block'
                     }}>
-                        <span style={{ color: 'black', fontSize: '16px', fontWeight: 900, letterSpacing: '1px' }}>
+                        <span style={{ color: 'black', fontSize: '16px', fontWeight: 900, letterSpacing: '1px', textShadow: '2px 2px 4px rgba(255,255,255,0.7)' }}>
                             RESULTADOS - FECHA {fechaPasada}
                         </span>
                     </div>
@@ -127,33 +135,33 @@ export const OverlayMarcadores: React.FC = () => {
                     {partidosFecha.map(p => {
                         const el = getEquipo(p.id_local);
                         const ev = getEquipo(p.id_visitante);
-                        const zoneColors: Record<string, string> = { 'A': '#3b82f6', 'B': '#22c55e', 'C': '#f97316' };
+
                         return (
                             <div key={p.id_partido} style={{
                                 display: 'flex', alignItems: 'stretch', background: '#000', color: '#fff',
                                 borderRadius: '4px', overflow: 'hidden', boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
                                 border: '1px solid rgba(255,255,255,0.1)', height: '48px'
                             }}>
-                                {/* ZONA */}
+                                {/* ZONA / COPA */}
                                 <div style={{
-                                    background: '#000', padding: '0 12px', display: 'flex', flexDirection: 'column', 
+                                    background: fechaPasada >= 6 ? (p.zona === 'A' ? '#d4af37' : '#a0a0a0') : '#000', padding: '0 12px', display: 'flex', flexDirection: 'column', 
                                     alignItems: 'center', justifyContent: 'center', 
-                                    borderRight: '1px solid rgba(255,255,255,0.1)', color: '#f5a623', minWidth: '45px'
+                                    borderRight: '1px solid rgba(255,255,255,0.1)', color: fechaPasada >= 6 && p.zona === 'A' ? '#000' : (fechaPasada >= 6 ? '#fff' : '#f5a623'), minWidth: '45px'
                                 }}>
-                                    <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8 }}>ZONA</span>
-                                    <span style={{ fontSize: '20px', fontWeight: 900, lineHeight: 0.9 }}>{p.zona}</span>
+                                    <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8, textShadow: fechaPasada >= 6 && p.zona === 'A' ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)' }}>{fechaPasada >= 6 ? 'COPA' : 'ZONA'}</span>
+                                    <span style={{ fontSize: fechaPasada >= 6 ? '14px' : '20px', fontWeight: 900, lineHeight: 0.9, textShadow: fechaPasada >= 6 && p.zona === 'A' ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)' }}>{fechaPasada >= 6 ? (p.zona === 'A' ? 'ORO' : 'PLATA') : p.zona}</span>
                                 </div>
 
                                 {/* LOCAL */}
                                 <div style={{
                                     background: el?.color || '#222',
-                                    padding: '0 20px', display: 'flex', alignItems: 'center',
-                                    flex: 1, justifyContent: 'flex-end', textShadow: '2px 2px 4px rgba(0,0,0,1)',
-                                    boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
+                                    padding: '0 15px', display: 'flex', alignItems: 'center', 
+                                    flex: 1, justifyContent: 'flex-end',
+                                    boxShadow: 'inset 0 0 15px rgba(0,0,0,0.3)',
                                     color: el?.color_texto ?? 'white',
                                     borderBottom: `4px solid ${el?.color_secundario || 'transparent'}`
                                 }}>
-                                    <span style={{ fontSize: '18px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif' }}>
+                                    <span style={{ fontSize: '18px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif', textShadow: (el?.color_texto === 'black' || el?.color_texto === '#000000') ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)' }}>
                                         {el?.nombre}
                                     </span>
                                 </div>
@@ -190,13 +198,13 @@ export const OverlayMarcadores: React.FC = () => {
                                 {/* VISITANTE */}
                                 <div style={{
                                     background: ev?.color || '#222',
-                                    padding: '0 20px', display: 'flex', alignItems: 'center',
-                                    flex: 1, justifyContent: 'flex-start', textShadow: '2px 2px 4px rgba(0,0,0,1)',
-                                    boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
+                                    padding: '0 15px', display: 'flex', alignItems: 'center', 
+                                    flex: 1, justifyContent: 'flex-start',
+                                    boxShadow: 'inset 0 0 15px rgba(0,0,0,0.3)',
                                     color: ev?.color_texto ?? 'white',
                                     borderBottom: `4px solid ${ev?.color_secundario || 'transparent'}`
                                 }}>
-                                    <span style={{ fontSize: '18px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif' }}>
+                                    <span style={{ fontSize: '18px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap', fontFamily: 'Impact, sans-serif', textShadow: (ev?.color_texto === 'black' || ev?.color_texto === '#000000') ? '2px 2px 4px rgba(255,255,255,1)' : '2px 2px 4px rgba(0,0,0,1)' }}>
                                         {ev?.nombre}
                                     </span>
                                 </div>
