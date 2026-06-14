@@ -207,14 +207,41 @@ export const OverlayExportFixture: React.FC = () => {
                                 const badgeBg = isPlayoff
                                     ? (p.zona === 'A' ? '#d4af37' : '#a0a0a0')
                                     : (zoneColors[p.zona] || '#374151');
-                                const badgeText = isPlayoff
-                                    ? `COPA ${p.zona === 'A' ? 'ORO' : 'PLATA'}`
-                                    : `ZONA ${p.zona}`;
+                                
+                                let badgeText = '';
+                                if (isPlayoff) {
+                                    const pid = p.id_partido.toUpperCase();
+                                    let instancia = '';
+                                    const minutos = parseHorario(p.turno_horario);
+
+                                    if (fechaSeleccionada >= 8) {
+                                        if (minutos === 600 || minutos === 690) { // 10:00 o 11:30
+                                            instancia = '3er/4to ';
+                                        } else if (minutos === 780 || minutos === 870) { // 13:00 o 14:30
+                                            instancia = 'FINAL ';
+                                        }
+                                    }
+
+                                    if (!instancia) {
+                                        if (pid.includes('FINAL') && !pid.includes('CUARTOS') && !pid.includes('SEMI')) {
+                                            instancia = 'FINAL ';
+                                        } else if (pid.includes('3ER') || pid.includes('TERCER') || pid.includes('3RO') || pid.includes('TERCERO')) {
+                                            instancia = '3er/4to ';
+                                        } else if (pid.includes('SEMI') || pid.includes('S-')) {
+                                            instancia = 'SEMIFINAL ';
+                                        } else if (pid.includes('CUARTOS') || pid.includes('Q-')) {
+                                            instancia = 'CUARTOS ';
+                                        }
+                                    }
+                                    badgeText = `${instancia}COPA DE ${p.zona === 'A' ? 'ORO' : 'PLATA'}`.trim();
+                                } else {
+                                    badgeText = `ZONA ${p.zona}`;
+                                }
 
                                 return (
                                     <div key={p.id_partido} style={{
                                         display: 'grid', 
-                                        gridTemplateColumns: '90px 1fr 140px',
+                                        gridTemplateColumns: '90px 1fr auto',
                                         alignItems: 'center', 
                                         background: 'rgba(255,255,255,0.06)',
                                         padding: '12px 20px', 
